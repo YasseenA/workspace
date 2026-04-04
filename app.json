@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Workspace",
+    "slug": "workspace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "workspace",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.workspace.app"
+    },
+    "android": {
+      "package": "com.workspace.app",
+      "adaptiveIcon": { "backgroundColor": "#6366f1" }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
