@@ -8,6 +8,9 @@ import { AuthProvider } from '../store/auth';
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {error: Error | null}> {
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: any) {
+    console.error('ErrorBoundary caught:', error, info);
+  }
   render() {
     if (this.state.error) {
       const err = this.state.error as Error;
@@ -15,7 +18,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {error:
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#fff' }}>
           <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'red', marginBottom: 12 }}>App Error</Text>
           <Text style={{ fontSize: 14, color: '#333', textAlign: 'center' }}>{err.message}</Text>
-          <Text style={{ fontSize: 11, color: '#666', marginTop: 12, textAlign: 'center' }}>{err.stack?.slice(0, 400)}</Text>
+          <Text style={{ fontSize: 11, color: '#666', marginTop: 12, textAlign: 'center' }}>{err.stack?.slice(0, 600)}</Text>
         </View>
       );
     }
