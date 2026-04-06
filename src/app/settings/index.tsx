@@ -95,8 +95,8 @@ export default function SettingsScreen() {
         <Section title="Integrations">
           <Row icon={Link2} color="#f59e0b" label="Canvas LMS"
             value={canvasConnected ? 'Connected' : 'Not connected'}
-            onPress={() => router.push('/canvas/index')} />
-          <Row icon={Brain} color="#8b5cf6" label="Claude AI" value="Configured" onPress={() => router.push('/ai-studio/index')} last />
+            onPress={() => router.push('/canvas')} />
+          <Row icon={Brain} color="#8b5cf6" label="Claude AI" value="Configured" onPress={() => router.push('/ai-studio')} last />
         </Section>
 
         <Section title="Preferences">
@@ -106,8 +106,8 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="Tools">
-          <Row icon={BookOpen} color="#6366f1" label="Notes" value={`${notes.length} notes`} onPress={() => router.push('/notes/index')} />
-          <Row icon={Timer} color="#f59e0b" label="Focus Timer" onPress={() => router.push('/focus/index')} last />
+          <Row icon={BookOpen} color="#6366f1" label="Notes" value={`${notes.length} notes`} onPress={() => router.push('/notes')} />
+          <Row icon={Timer} color="#f59e0b" label="Focus Timer" onPress={() => router.push('/focus')} last />
         </Section>
 
         <Section title="About">

@@ -46,14 +46,14 @@ export default function HomeScreen() {
             <Text style={styles.greeting}>{greeting},</Text>
             <Text style={styles.name}>{user?.name?.split(' ')[0] || 'Student'} 👋</Text>
           </View>
-          <TouchableOpacity onPress={() => router.push('/settings/index')} style={styles.avatar}>
+          <TouchableOpacity onPress={() => router.push('/settings')} style={styles.avatar}>
             <Text style={styles.avatarText}>{(user?.name?.[0] || 'S').toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Alert banners */}
         {overdueTasks.length > 0 && (
-          <TouchableOpacity onPress={() => router.push('/tasks/index')} style={styles.alert}>
+          <TouchableOpacity onPress={() => router.push('/tasks')} style={styles.alert}>
             <Clock size={14} color="#fff" />
             <Text style={styles.alertText}>{overdueTasks.length} overdue task{overdueTasks.length > 1 ? 's' : ''} — tap to view</Text>
           </TouchableOpacity>
@@ -88,7 +88,7 @@ export default function HomeScreen() {
         {/* Due today */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Due Today</Text>
-          <TouchableOpacity onPress={() => router.push('/tasks/index')} style={styles.seeAll}>
+          <TouchableOpacity onPress={() => router.push('/tasks')} style={styles.seeAll}>
             <Text style={styles.seeAllText}>See all</Text>
             <ChevronRight size={14} color={colors.primary} />
           </TouchableOpacity>
@@ -113,7 +113,7 @@ export default function HomeScreen() {
         {/* Recent notes */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Notes</Text>
-          <TouchableOpacity onPress={() => router.push('/notes/index')} style={styles.seeAll}>
+          <TouchableOpacity onPress={() => router.push('/notes')} style={styles.seeAll}>
             <Text style={styles.seeAllText}>See all</Text>
             <ChevronRight size={14} color={colors.primary} />
           </TouchableOpacity>
@@ -144,7 +144,7 @@ export default function HomeScreen() {
           <>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Pending Tasks</Text>
-              <TouchableOpacity onPress={() => router.push('/tasks/index')} style={styles.seeAll}>
+              <TouchableOpacity onPress={() => router.push('/tasks')} style={styles.seeAll}>
                 <Text style={styles.seeAllText}>See all</Text>
                 <ChevronRight size={14} color={colors.primary} />
               </TouchableOpacity>

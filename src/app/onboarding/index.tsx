@@ -18,7 +18,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { completeOnboarding } = useAuthStore();
 
-  const finish = () => { completeOnboarding(); router.replace('/home/index'); };
+  const finish = () => { completeOnboarding(); router.replace('/home'); };
 
   const s = STEPS[step];
   const Icon = s.icon;
