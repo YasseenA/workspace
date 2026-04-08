@@ -25,7 +25,10 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!validate()) return;
-    try { await login(email.trim(), password); }
+    try {
+      await login(email.trim(), password);
+      router.replace('/home');
+    }
     catch (e: any) { Alert.alert('Login Failed', e.message); }
   };
 

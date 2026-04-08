@@ -25,16 +25,10 @@ const webStorage = {
   removeItem: (name: string) => { try { if (typeof localStorage !== 'undefined') localStorage.removeItem(name); } catch {} },
 };
 
-const MOCK: Task[] = [
-  { id: 't1', title: 'Calculus Problem Set 4', description: 'Complete problems 1-25', priority: 'high', status: 'todo', dueDate: new Date(Date.now()+86400000).toISOString(), tags: ['math'], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: 't2', title: 'History Essay Draft', description: 'Write 5-page essay on WWI', priority: 'critical', status: 'in_progress', dueDate: new Date(Date.now()+172800000).toISOString(), tags: ['history'], createdAt: new Date(Date.now()-86400000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 't3', title: 'Read CS Chapter 8', priority: 'medium', status: 'done', tags: ['cs'], createdAt: new Date(Date.now()-172800000).toISOString(), updatedAt: new Date(Date.now()-86400000).toISOString() },
-];
-
 export const useTasksStore = create<TasksState>()(
   persist(
     (set, get) => ({
-      tasks: MOCK,
+      tasks: [],
       createTask: (data) => {
         const task: Task = { id: 't'+Date.now(), title: data.title||'New Task', description: data.description, priority: data.priority||'medium', status: 'todo', dueDate: data.dueDate, canvasId: data.canvasId, tags: data.tags||[], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         set(s => ({ tasks: [task, ...s.tasks] }));

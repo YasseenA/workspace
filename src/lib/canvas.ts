@@ -1,4 +1,7 @@
-const BASE = process.env.EXPO_PUBLIC_CANVAS_BASE_URL || 'https://canvas.bellevuecollege.edu';
+import { Platform } from 'react-native';
+const BASE = Platform.OS === 'web'
+  ? 'http://localhost:3001'
+  : (process.env.EXPO_PUBLIC_CANVAS_BASE_URL || 'https://canvas.bellevuecollege.edu');
 const CLIENT_ID = process.env.EXPO_PUBLIC_CANVAS_CLIENT_ID || '';
 
 export const canvas = {

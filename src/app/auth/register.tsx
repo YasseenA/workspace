@@ -27,7 +27,10 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!validate()) return;
-    try { await register(name.trim(), email.trim(), password); }
+    try {
+      await register(name.trim(), email.trim(), password);
+      router.replace('/onboarding');
+    }
     catch (e: any) { Alert.alert('Registration Failed', e.message); }
   };
 

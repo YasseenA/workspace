@@ -1,62 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link2, RefreshCw, CheckCircle, BookOpen, AlertCircle, ChevronRight, Calendar, Download } from 'lucide-react-native';
+import { Link2, RefreshCw, CheckCircle, BookOpen, X, Download, ExternalLink } from 'lucide-react-native';
 import { useCanvasStore } from '../../store/canvas';
 import { useTasksStore } from '../../store/tasks';
 import { Card, Button, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
 import { colors } from '../../lib/theme';
 import { fmt } from '../../utils/helpers';
-import { canvas } from '../../lib/canvas';
 
 export default function CanvasScreen() {
   const { connected, courses, assignments, lastSync, isSyncing, error, connect, disconnect, sync } = useCanvasStore();
   const { importFromCanvas, tasks } = useTasksStore();
+  const [showModal, setShowModal] = useState(false);
+  const [token, setToken] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState('');
   const [importing, setImporting] = useState(false);
 
   const handleConnect = async () => {
-    // In a real app this opens OAuth. For demo, we simulate with a token.
-    Alert.alert(
-      'Connect Canvas',
-      'This will open your Bellevue College Canvas login.\n\nFor demo purposes, tap "Demo Mode" to load mock data.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Demo Mode', onPress: () => connectDemo() },
-        { text: 'Open Canvas', onPress: () => {
-          const url = canvas.getAuthUrl();
-          Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open Canvas. Make sure your Canvas Client ID is set in .env'));
-        }},
-      ]
-    );
-  };
-
-  const connectDemo = async () => {
-    // Simulate connected state with mock data
-    const mockCourses = [
-      { id: 1, name: 'MATH 151 - Calculus I', course_code: 'MATH151', start_at: '', end_at: '' },
-      { id: 2, name: 'HIST 147 - World History', course_code: 'HIST147', start_at: '', end_at: '' },
-      { id: 3, name: 'CS 110 - Intro to Programming', course_code: 'CS110', start_at: '', end_at: '' },
-    ];
-    const mockAssignments = [
-      { id: 101, course_id: 1, name: 'Problem Set 5', description: 'Integration techniques', due_at: new Date(Date.now()+86400000*2).toISOString(), points_possible: 50, html_url: '', submission_types: ['online_text_entry'] },
-      { id: 102, course_id: 2, name: 'Essay: Industrial Revolution', description: '', due_at: new Date(Date.now()+86400000*4).toISOString(), points_possible: 100, html_url: '', submission_types: ['online_upload'] },
-      { id: 103, course_id: 3, name: 'Lab 3: Loops', description: '', due_at: new Date(Date.now()+86400000).toISOString(), points_possible: 30, html_url: '', submission_types: ['online_text_entry'] },
-    ];
-    useCanvasStore.setState({ connected: true, token: 'demo_token', courses: mockCourses, assignments: mockAssignments, lastSync: new Date().toISOString() });
+    if (!token.trim()) { setConnectError('Please paste your Canvas access token.'); return; }
+    setConnecting(true);
+    setConnectError('');
+    try {
+      await connect(token.trim());
+      setShowModal(false);
+      setToken('');
+    } catch (e: any) {
+      setConnectError(e.message || 'Connection failed. Check your token and try again.');
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const handleSync = async () => {
-    try { await sync(); Alert.alert('Synced!', `${courses.length} courses, ${assignments.length} assignments.`); }
-    catch(e: any) { Alert.alert('Sync Failed', e.message); }
+    try { await sync(); }
+    catch(e: any) { /* error shown in store */ }
   };
 
   const handleImport = async () => {
     setImporting(true);
     try {
       const count = importFromCanvas(assignments);
-      Alert.alert('Imported!', count > 0 ? `${count} new tasks added from Canvas.` : 'All assignments already imported.');
+      const msg = count > 0 ? `${count} new tasks added to your Tasks list!` : 'All assignments already imported.';
+      if (Platform.OS === 'web') { window.alert(msg); }
     } finally { setImporting(false); }
+  };
+
+  const handleDisconnect = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Disconnect from Canvas?')) disconnect();
+    }
   };
 
   const courseForId = (id: number) => courses.find(c => c.id === id);
@@ -77,20 +71,40 @@ export default function CanvasScreen() {
           <Card style={styles.connectCard}>
             <View style={styles.connectIcon}><Link2 size={40} color={colors.primary} strokeWidth={1.5} /></View>
             <Text style={styles.connectTitle}>Connect Bellevue College Canvas</Text>
-            <Text style={styles.connectDesc}>Sync your assignments, courses, and due dates automatically. Never miss a deadline.</Text>
-            <View style={styles.benefits}>
-              {['Sync assignments as tasks', 'See due dates on dashboard', 'Get deadline notifications', 'Auto-organize by course'].map(b => (
-                <View key={b} style={styles.benefit}>
-                  <CheckCircle size={14} color={colors.success} />
-                  <Text style={styles.benefitText}>{b}</Text>
+            <Text style={styles.connectDesc}>
+              Sync your real assignments, courses, and due dates. Uses your Canvas API access token.
+            </Text>
+
+            {/* How to get token */}
+            <View style={styles.steps}>
+              <Text style={styles.stepsTitle}>How to get your token:</Text>
+              {[
+                'Go to canvas.bellevuecollege.edu',
+                'Click Account → Settings',
+                'Scroll to "Approved Integrations"',
+                'Click "+ New Access Token"',
+                'Copy the token and paste it below',
+              ].map((s, i) => (
+                <View key={i} style={styles.step}>
+                  <View style={styles.stepNum}><Text style={styles.stepNumText}>{i+1}</Text></View>
+                  <Text style={styles.stepText}>{s}</Text>
                 </View>
               ))}
             </View>
-            <Button variant="primary" fullWidth onPress={handleConnect}>Connect Canvas Account</Button>
+
+            <TouchableOpacity
+              style={styles.canvasLink}
+              onPress={() => { if (Platform.OS === 'web') window.open('https://canvas.bellevuecollege.edu/profile/settings', '_blank'); }}>
+              <ExternalLink size={14} color={colors.primary} />
+              <Text style={styles.canvasLinkText}>Open Canvas Settings</Text>
+            </TouchableOpacity>
+
+            <Button variant="primary" fullWidth onPress={() => setShowModal(true)} style={{ marginTop: 16 }}>
+              Connect with Access Token
+            </Button>
           </Card>
         ) : (
           <>
-            {/* Status card */}
             <Card style={styles.statusCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <CheckCircle size={18} color={colors.success} fill={colors.success + '30'} />
@@ -100,7 +114,6 @@ export default function CanvasScreen() {
               {error && <Text style={styles.errorText}>⚠️ {error}</Text>}
             </Card>
 
-            {/* Stats */}
             <View style={styles.statsRow}>
               <Card style={styles.statCard}>
                 <Text style={styles.statNum}>{courses.length}</Text>
@@ -116,12 +129,11 @@ export default function CanvasScreen() {
               </Card>
             </View>
 
-            {/* Import button */}
-            <Button variant="secondary" fullWidth onPress={handleImport} loading={importing} leftIcon={<Download size={15} color={colors.text} />} style={{ marginBottom: 16 }}>
+            <Button variant="secondary" fullWidth onPress={handleImport} loading={importing}
+              leftIcon={<Download size={15} color={colors.text} />} style={{ marginBottom: 12 }}>
               Import All as Tasks
             </Button>
 
-            {/* Courses */}
             <Text style={styles.sectionTitle}>Your Courses</Text>
             {courses.map(course => (
               <Card key={course.id} style={styles.courseCard} padding={false}>
@@ -140,12 +152,11 @@ export default function CanvasScreen() {
               </Card>
             ))}
 
-            {/* Upcoming assignments */}
             <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Upcoming Assignments</Text>
             {assignments
               .filter(a => !a.due_at || new Date(a.due_at) > new Date())
               .sort((a, b) => new Date(a.due_at || '').getTime() - new Date(b.due_at || '').getTime())
-              .slice(0, 8)
+              .slice(0, 10)
               .map(a => {
                 const due = a.due_at ? fmt.dueDate(a.due_at) : null;
                 const course = courseForId(a.course_id);
@@ -155,7 +166,7 @@ export default function CanvasScreen() {
                     <View style={styles.assignRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.assignName} numberOfLines={1}>{a.name}</Text>
-                        {course && <Text style={styles.assignCourse}>{course.course_code}</Text>}
+                        {course && <Text style={styles.assignCourse}>{course.course_code} · {a.points_possible}pts</Text>}
                       </View>
                       <View style={{ alignItems: 'flex-end', gap: 4 }}>
                         {due && <Text style={[styles.assignDue, { color: due.color }]}>{due.label}</Text>}
@@ -167,14 +178,47 @@ export default function CanvasScreen() {
               })}
 
             <View style={{ height: 16 }} />
-            <Button variant="ghost" onPress={() => { Alert.alert('Disconnect', 'Disconnect from Canvas?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Disconnect', style: 'destructive', onPress: disconnect }]); }}>
-              Disconnect Canvas
-            </Button>
+            <Button variant="ghost" onPress={handleDisconnect}>Disconnect Canvas</Button>
           </>
         )}
-      <TabBar />
+
         <View style={{ height: 100 }} />
+        <TabBar />
       </ScrollView>
+
+      {/* Token Modal */}
+      {showModal && (
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Paste Your Canvas Token</Text>
+              <TouchableOpacity onPress={() => { setShowModal(false); setToken(''); setConnectError(''); }}>
+                <X size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDesc}>
+              Generate a token from Canvas → Account → Settings → Approved Integrations → New Access Token
+            </Text>
+
+            <TextInput
+              style={styles.tokenInput}
+              placeholder="Paste token here..."
+              placeholderTextColor={colors.textTertiary}
+              value={token}
+              onChangeText={setToken}
+              autoFocus
+              multiline
+            />
+
+            {connectError ? <Text style={styles.connectErr}>{connectError}</Text> : null}
+
+            <Button variant="primary" fullWidth onPress={handleConnect} loading={connecting} style={{ marginTop: 12 }}>
+              {connecting ? 'Connecting...' : 'Connect'}
+            </Button>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -185,13 +229,18 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title: { fontSize: 28, fontWeight: '800', color: colors.text },
   syncBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  connectCard: { alignItems: 'center', paddingVertical: 32 },
-  connectIcon: { width: 80, height: 80, borderRadius: 24, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  connectCard: { paddingVertical: 24 },
+  connectIcon: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 16, alignSelf: 'center' },
   connectTitle: { fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 8 },
   connectDesc: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  benefits: { alignSelf: 'stretch', marginBottom: 24, gap: 10 },
-  benefit: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  benefitText: { fontSize: 14, color: colors.text },
+  steps: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 16, marginBottom: 16, gap: 10 },
+  stepsTitle: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 6 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  stepNumText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  stepText: { fontSize: 13, color: colors.textSecondary, flex: 1 },
+  canvasLink: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center' },
+  canvasLinkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   statusCard: { marginBottom: 12, gap: 4 },
   statusText: { fontSize: 14, fontWeight: '600', color: colors.text },
   lastSync: { fontSize: 12, color: colors.textTertiary },
@@ -211,4 +260,11 @@ const styles = StyleSheet.create({
   assignName: { fontSize: 14, fontWeight: '500', color: colors.text },
   assignCourse: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   assignDue: { fontSize: 11, fontWeight: '600' },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modal: { backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 480 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  modalDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginBottom: 16 },
+  tokenInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, fontSize: 13, color: colors.text, minHeight: 80, fontFamily: 'monospace' },
+  connectErr: { fontSize: 13, color: colors.error, marginTop: 8 },
 });

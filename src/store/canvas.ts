@@ -26,8 +26,17 @@ export const useCanvasStore = create<CanvasState>()(
         set({ isSyncing: true, error: null });
         try {
           const courses = await canvas.getCourses(token);
-          set({ connected: true, token, courses, isSyncing: false });
-        } catch(e: any) { set({ isSyncing: false, error: e.message }); throw e; }
+          if (!Array.isArray(courses)) throw new Error('Invalid response — check your token and try again.');
+          const activeCourses = courses.filter((c: CanvasCourse) => c.name && !c.name.startsWith('Sandbox'));
+          const assignments = await canvas.getAllAssignments(token, activeCourses.map((c: CanvasCourse) => c.id));
+          set({ connected: true, token, courses: activeCourses, assignments, lastSync: new Date().toISOString(), isSyncing: false });
+        } catch(e: any) {
+          const msg = e.message?.includes('Failed to fetch')
+            ? 'Could not reach Canvas. Check your internet connection.'
+            : e.message || 'Connection failed.';
+          set({ isSyncing: false, error: msg });
+          throw new Error(msg);
+        }
       },
       disconnect: () => set({ connected: false, token: null, courses: [], assignments: [], lastSync: null }),
       sync: async () => {
