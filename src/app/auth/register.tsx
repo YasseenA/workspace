@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { User, Mail, Lock } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth';
 import { Input, Button, Card } from '../../components/ui';
-import { colors } from '../../lib/theme';
+import { useColors, colors } from '../../lib/theme';
+import { showAlert } from '../../utils/helpers';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { register, isLoading } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,11 +33,11 @@ export default function RegisterScreen() {
       await register(name.trim(), email.trim(), password);
       router.replace('/onboarding');
     }
-    catch (e: any) { Alert.alert('Registration Failed', e.message); }
+    catch (e: any) { showAlert('Registration Failed', e.message); }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={{flex:1}}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>

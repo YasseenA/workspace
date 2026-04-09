@@ -40,6 +40,20 @@ export const canvas = {
     const results = await Promise.all(courseIds.map(id => canvas.getAssignments(token, id).catch(() => [])));
     return results.flat();
   },
+
+  getSubmissions: async (token: string, courseId: string | number) => {
+    const res = await fetch(
+      `${BASE}/api/v1/courses/${courseId}/students/submissions?student_ids[]=self&per_page=100`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  getAllSubmissions: async (token: string, courseIds: (string | number)[]) => {
+    const results = await Promise.all(courseIds.map(id => canvas.getSubmissions(token, id).catch(() => [])));
+    return results.flat();
+  },
 };
 
 export interface CanvasCourse {
@@ -59,4 +73,15 @@ export interface CanvasAssignment {
   points_possible: number;
   html_url: string;
   submission_types: string[];
+}
+
+export interface CanvasSubmission {
+  assignment_id: number;
+  course_id: number;
+  workflow_state: 'submitted' | 'unsubmitted' | 'graded' | 'pending_review';
+  submitted_at: string | null;
+  score: number | null;
+  grade: string | null;
+  late: boolean;
+  missing: boolean;
 }

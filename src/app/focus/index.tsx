@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Vibration } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Vibration } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Play, Pause, RotateCcw, Settings, Coffee, Brain, Flame } from 'lucide-react-native';
 import { useFocusStore } from '../../store/focus';
 import { Card, Button } from '../../components/ui';
-import { colors } from '../../lib/theme';
+import TabBar from '../../components/layout/TabBar';
+import { useColors, colors } from '../../lib/theme';
+import { showAlert } from '../../utils/helpers';
 
 type Mode = 'work' | 'break';
 
 export default function FocusScreen() {
+  const colors = useColors();
   const { workMinutes, breakMinutes, sessions, totalFocusMinutes, streak, setWorkMinutes, setBreakMinutes, recordSession } = useFocusStore();
   const [mode, setMode] = useState<Mode>('work');
   const [running, setRunning] = useState(false);
@@ -41,18 +44,18 @@ export default function FocusScreen() {
   }, [running, mode]);
 
   const handleTimerEnd = () => {
-    Vibration.vibrate([500, 200, 500]);
+    if (Platform.OS !== 'web') Vibration.vibrate([500, 200, 500]);
     if (mode === 'work') {
       recordSession(workMinutes);
       setCompletedSessions(c => c + 1);
-      Alert.alert('Work session complete! 🎉', 'Time for a break.', [
+      showAlert('Work session complete! 🎉', 'Time for a break.', [
         { text: 'Start Break', onPress: () => { setMode('break'); setSeconds(breakMinutes * 60); setRunning(true); } },
-        { text: 'Skip', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); } }
+        { text: 'Skip', style: 'cancel', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); } }
       ]);
     } else {
-      Alert.alert('Break over!', 'Ready for another session?', [
+      showAlert('Break over!', 'Ready for another session?', [
         { text: 'Start Working', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); setRunning(true); } },
-        { text: 'Not yet' }
+        { text: 'Not yet', style: 'cancel' }
       ]);
     }
   };
@@ -69,9 +72,9 @@ export default function FocusScreen() {
   const strokeDashoffset = circumference * (1 - progress);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <View style={styles.container}>
-        <Text style={styles.title}>Focus Timer</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Focus Timer</Text>
 
         {/* Mode toggle */}
         <View style={styles.modeRow}>
@@ -167,13 +170,14 @@ export default function FocusScreen() {
           </View>
         )}
       </View>
+      <TabBar />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  container: { flex: 1, alignItems: 'center', padding: 24, paddingTop: 8 },
+  container: { flex: 1, alignItems: 'center', padding: 24, paddingTop: 8, paddingBottom: 80 },
   title: { fontSize: 24, fontWeight: '800', color: colors.text, marginBottom: 16 },
   modeRow: { flexDirection: 'row', gap: 10, marginBottom: 32 },
   modeBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: '#fff' },

@@ -6,10 +6,11 @@ import { useCanvasStore } from '../../store/canvas';
 import { useTasksStore } from '../../store/tasks';
 import { Card, Button, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
-import { colors } from '../../lib/theme';
+import { useColors, colors } from '../../lib/theme';
 import { fmt } from '../../utils/helpers';
 
 export default function CanvasScreen() {
+  const colors = useColors();
   const { connected, courses, assignments, lastSync, isSyncing, error, connect, disconnect, sync } = useCanvasStore();
   const { importFromCanvas, tasks } = useTasksStore();
   const [showModal, setShowModal] = useState(false);
@@ -56,10 +57,10 @@ export default function CanvasScreen() {
   const courseForId = (id: number) => courses.find(c => c.id === id);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Text style={styles.title}>Canvas LMS</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Canvas LMS</Text>
           {connected && (
             <TouchableOpacity onPress={handleSync} style={styles.syncBtn} disabled={isSyncing}>
               {isSyncing ? <ActivityIndicator size="small" color={colors.primary} /> : <RefreshCw size={16} color={colors.primary} />}
@@ -79,7 +80,7 @@ export default function CanvasScreen() {
             <View style={styles.steps}>
               <Text style={styles.stepsTitle}>How to get your token:</Text>
               {[
-                'Go to canvas.bellevuecollege.edu',
+                'Go to bc.instructure.com',
                 'Click Account → Settings',
                 'Scroll to "Approved Integrations"',
                 'Click "+ New Access Token"',
@@ -94,7 +95,7 @@ export default function CanvasScreen() {
 
             <TouchableOpacity
               style={styles.canvasLink}
-              onPress={() => { if (Platform.OS === 'web') window.open('https://canvas.bellevuecollege.edu/profile/settings', '_blank'); }}>
+              onPress={() => { if (Platform.OS === 'web') window.open('https://bc.instructure.com/profile/settings', '_blank'); }}>
               <ExternalLink size={14} color={colors.primary} />
               <Text style={styles.canvasLinkText}>Open Canvas Settings</Text>
             </TouchableOpacity>

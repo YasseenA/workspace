@@ -7,26 +7,40 @@ import { useAuthStore } from '../../store/auth';
 import { useNotesStore } from '../../store/notes';
 import { useTasksStore } from '../../store/tasks';
 import { useFocusStore } from '../../store/focus';
+import { useCanvasStore } from '../../store/canvas';
 import { Card, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
-import { colors } from '../../lib/theme';
+import { useColors, colors } from '../../lib/theme';
 import { fmt, priorityColor } from '../../utils/helpers';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { user } = useAuthStore();
   const { notes } = useNotesStore();
   const { tasks } = useTasksStore();
   const { sessions, totalFocusMinutes, streak } = useFocusStore();
+  const { assignments, courses, connected: canvasConnected } = useCanvasStore();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => { setRefreshing(true); await new Promise(r => setTimeout(r, 800)); setRefreshing(false); };
 
   const now = new Date();
+
+  // Merge Canvas assignments + manual tasks for display
+  const importedIds = new Set(tasks.map(t => t.canvasId).filter(Boolean));
+  const canvasDueToday = canvasConnected ? assignments.filter(a =>
+    a.due_at && new Date(a.due_at).toDateString() === now.toDateString()
+  ) : [];
+  const canvasUpcoming = canvasConnected ? assignments.filter(a =>
+    a.due_at && new Date(a.due_at) > now && new Date(a.due_at).toDateString() !== now.toDateString()
+  ).slice(0, 3) : [];
+
   const dueTodayTasks = tasks.filter(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate).toDateString() === now.toDateString());
   const overdueTasks = tasks.filter(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now && new Date(t.dueDate).toDateString() !== now.toDateString());
   const recentNotes = notes.slice(0, 3);
   const pendingTasks = tasks.filter(t => t.status !== 'done').slice(0, 4);
+  const courseMap = new Map(courses.map(c => [c.id, c]));
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -38,13 +52,13 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.scroll} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{greeting},</Text>
-            <Text style={styles.name}>{user?.name?.split(' ')[0] || 'Student'} 👋</Text>
+            <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting},</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{user?.name?.split(' ')[0] || 'Student'} 👋</Text>
           </View>
           <TouchableOpacity onPress={() => router.push('/settings')} style={styles.avatar}>
             <Text style={styles.avatarText}>{(user?.name?.[0] || 'S').toUpperCase()}</Text>
@@ -63,8 +77,8 @@ export default function HomeScreen() {
         <View style={styles.statsRow}>
           {[
             { label: 'Notes', value: notes.length, color: colors.primary },
-            { label: 'Due today', value: dueTodayTasks.length, color: '#f59e0b' },
-            { label: 'Sessions', value: sessions, color: '#10b981' },
+            { label: 'Due today', value: dueTodayTasks.length + canvasDueToday.length, color: '#f59e0b' },
+            { label: 'Assignments', value: assignments.length, color: '#10b981' },
             { label: 'Focus hrs', value: Math.round(totalFocusMinutes / 60 * 10) / 10, color: '#8b5cf6' },
           ].map(s => (
             <Card key={s.label} style={styles.statCard} padding={false}>
@@ -80,9 +94,9 @@ export default function HomeScreen() {
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.qaRow}>
           <QuickAction icon={FileText} label="New Note" color={colors.primary} route="/notes/editor" />
-          <QuickAction icon={CheckSquare} label="Add Task" color="#10b981" route="/tasks/index" />
-          <QuickAction icon={Zap} label="AI Studio" color="#8b5cf6" route="/ai-studio/index" />
-          <QuickAction icon={Timer} label="Focus" color="#f59e0b" route="/focus/index" />
+          <QuickAction icon={CheckSquare} label="Add Task" color="#10b981" route="/tasks" />
+          <QuickAction icon={Zap} label="AI Studio" color="#8b5cf6" route="/ai-studio" />
+          <QuickAction icon={Timer} label="Focus" color="#f59e0b" route="/focus" />
         </View>
 
         {/* Due today */}
@@ -93,21 +107,63 @@ export default function HomeScreen() {
             <ChevronRight size={14} color={colors.primary} />
           </TouchableOpacity>
         </View>
-        {dueTodayTasks.length === 0 ? (
+        {dueTodayTasks.length === 0 && canvasDueToday.length === 0 ? (
           <Card><Text style={styles.empty}>No tasks due today 🎉</Text></Card>
         ) : (
-          dueTodayTasks.slice(0, 3).map(task => (
-            <Card key={task.id} style={styles.taskCard} padding={false}>
-              <View style={styles.taskRow}>
-                <View style={[styles.priorityDot, { backgroundColor: priorityColor(task.priority) }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
-                  {task.dueDate && <Text style={styles.taskDue}>{fmt.dueDate(task.dueDate)?.label}</Text>}
+          <>
+            {dueTodayTasks.slice(0, 3).map(task => (
+              <Card key={task.id} style={styles.taskCard} padding={false}>
+                <View style={styles.taskRow}>
+                  <View style={[styles.priorityDot, { backgroundColor: priorityColor(task.priority) }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
+                    {task.dueDate && <Text style={styles.taskDue}>{fmt.dueDate(task.dueDate)?.label}</Text>}
+                  </View>
+                  <Flag size={14} color={priorityColor(task.priority)} />
                 </View>
-                <Flag size={14} color={priorityColor(task.priority)} />
-              </View>
-            </Card>
-          ))
+              </Card>
+            ))}
+            {canvasDueToday.map(a => (
+              <Card key={a.id} style={styles.taskCard} padding={false}>
+                <View style={styles.taskRow}>
+                  <View style={[styles.priorityDot, { backgroundColor: '#f59e0b' }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.taskTitle} numberOfLines={1}>{a.name}</Text>
+                    <Text style={styles.taskDue}>{courseMap.get(a.course_id)?.course_code || 'Canvas'} · Due today</Text>
+                  </View>
+                  <BookOpen size={14} color="#f59e0b" />
+                </View>
+              </Card>
+            ))}
+          </>
+        )}
+
+        {/* Canvas upcoming */}
+        {canvasUpcoming.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Upcoming from Canvas</Text>
+              <TouchableOpacity onPress={() => router.push('/canvas')} style={styles.seeAll}>
+                <Text style={styles.seeAllText}>See all</Text>
+                <ChevronRight size={14} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            {canvasUpcoming.map(a => {
+              const due = a.due_at ? fmt.dueDate(a.due_at) : null;
+              return (
+                <Card key={a.id} style={styles.taskCard} padding={false}>
+                  <View style={styles.taskRow}>
+                    <View style={[styles.priorityDot, { backgroundColor: colors.primary }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.taskTitle} numberOfLines={1}>{a.name}</Text>
+                      <Text style={styles.taskDue}>{courseMap.get(a.course_id)?.course_code || 'Canvas'}</Text>
+                    </View>
+                    {due && <Text style={[styles.taskDue, { color: due.color }]}>{due.label}</Text>}
+                  </View>
+                </Card>
+              );
+            })}
+          </>
         )}
 
         {/* Recent notes */}

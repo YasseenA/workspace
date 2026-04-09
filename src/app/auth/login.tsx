@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth';
 import { Input, Button, Card } from '../../components/ui';
-import { colors } from '../../lib/theme';
+import { useColors, colors } from '../../lib/theme';
+import { showAlert } from '../../utils/helpers';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { login, isLoading } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,11 +31,11 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace('/home');
     }
-    catch (e: any) { Alert.alert('Login Failed', e.message); }
+    catch (e: any) { showAlert('Login Failed', e.message); }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={{flex:1}}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>

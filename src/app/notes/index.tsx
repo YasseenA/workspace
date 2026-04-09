@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Search, Plus, Pin, Star, MoreVertical, Grid2x2, List, Trash2, BookOpen } from 'lucide-react-native';
 import { useNotesStore } from '../../store/notes';
 import { Card, EmptyState, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
-import { colors } from '../../lib/theme';
-import { fmt, truncate } from '../../utils/helpers';
+import { useColors, colors } from '../../lib/theme';
+import { fmt, truncate, showAlert } from '../../utils/helpers';
 
 export default function NotesScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { notes, notebooks, togglePin, toggleFavorite, deleteNote } = useNotesStore();
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'list'|'grid'>('list');
@@ -25,7 +26,7 @@ export default function NotesScreen() {
   }, [notes, search, activeNotebook]);
 
   const handleDelete = (id: string) => {
-    Alert.alert('Delete Note', 'Are you sure?', [
+    showAlert('Delete Note', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => { deleteNote(id); setShowMore(null); } }
     ]);
@@ -83,9 +84,9 @@ export default function NotesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Notes</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Notes</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity onPress={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')} style={styles.iconBtn}>
             {viewMode === 'list' ? <Grid2x2 size={18} color={colors.textSecondary} /> : <List size={18} color={colors.textSecondary} />}

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, FileText, BookOpen, HelpCircle, PenTool, Shield, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Card, Button, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
-import { colors } from '../../lib/theme';
+import { useColors, colors } from '../../lib/theme';
+import { showAlert } from '../../utils/helpers';
 import { claude } from '../../lib/claude';
 import { gptzero } from '../../lib/gptzero';
+
+const hasApiKey = !!process.env.EXPO_PUBLIC_CLAUDE_API_KEY && process.env.EXPO_PUBLIC_CLAUDE_API_KEY !== 'sk-ant-your-key-here';
 
 type Tool = 'summarize' | 'explain' | 'flashcards' | 'quiz' | 'studyGuide' | 'writing' | 'aiCheck';
 
@@ -22,6 +25,7 @@ const TOOLS = [
 ] as const;
 
 export default function AIStudioScreen() {
+  const colors = useColors();
   const [tool, setTool] = useState<Tool>('summarize');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,7 +47,7 @@ export default function AIStudioScreen() {
   const clear = () => { setOutput(''); setFlashcards([]); setQuiz([]); setFlippedCards(new Set()); setSelectedAnswers({}); setShowAnswers({}); setAiCheckResult(null); };
 
   const run = async () => {
-    if (!input.trim()) { Alert.alert('Input required', 'Please paste some text first.'); return; }
+    if (!input.trim()) { showAlert('Input required', 'Please paste some text first.'); return; }
     setLoading(true); clear();
     try {
       if (tool === 'summarize') setOutput(await claude.summarize(input, summaryLen));
@@ -57,26 +61,37 @@ export default function AIStudioScreen() {
         setAiCheckResult(result);
       }
     } catch(e: any) {
-      Alert.alert('Error', e.message || 'Something went wrong. Check your API key in .env');
+      showAlert('Error', e.message || 'Something went wrong. Check your API key in .env');
     } finally { setLoading(false); }
   };
 
   const copy = async (text: string) => {
     await Clipboard.setStringAsync(text);
-    Alert.alert('Copied!', 'Text copied to clipboard.');
+    if (Platform.OS === 'web') window.alert('Copied to clipboard!');
+    else showAlert('Copied!', 'Text copied to clipboard.');
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Zap size={22} color={colors.accent} />
-            <Text style={styles.title}>AI Studio</Text>
+            <Text style={[styles.title, { color: colors.text }]}>AI Studio</Text>
           </View>
           <Text style={styles.subtitle}>Powered by Claude</Text>
         </View>
+
+        {/* API key warning */}
+        {!hasApiKey && (
+          <View style={styles.keyWarning}>
+            <Text style={styles.keyWarningText}>
+              ⚠️ Claude API key not configured. Add your key to the <Text style={{ fontWeight: '700' }}>.env</Text> file:{'\n'}
+              <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>EXPO_PUBLIC_CLAUDE_API_KEY=sk-ant-...</Text>
+            </Text>
+          </View>
+        )}
 
         {/* Tool selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolsRow}>
@@ -277,6 +292,8 @@ const styles = StyleSheet.create({
   optBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   optBtnText: { fontSize: 12, color: colors.textSecondary, fontWeight: '500' },
   optBtnTextActive: { color: '#fff' },
+  keyWarning: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#f59e0b', borderRadius: 12, padding: 14, marginBottom: 16 },
+  keyWarningText: { fontSize: 13, color: '#92400e', lineHeight: 20 },
   disclaimer: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: '#f8fafc', borderRadius: 8, padding: 10, marginTop: 8 },
   disclaimerText: { fontSize: 11, color: colors.textSecondary, lineHeight: 16, flex: 1 },
   outputCard: { marginBottom: 16 },
