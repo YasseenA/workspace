@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { User, Bell, Moon, Shield, HelpCircle, LogOut, ChevronRight, Brain, Link2, Timer, BookOpen, Star, ExternalLink } from 'lucide-react-native';
+import { User, Bell, Moon, Shield, HelpCircle, LogOut, ChevronRight, Brain, Link2, Timer, BookOpen, Star, ExternalLink, TrendingUp } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth';
 import { useCanvasStore } from '../../store/canvas';
 import { useNotesStore } from '../../store/notes';
@@ -105,7 +105,8 @@ export default function SettingsScreen() {
 
         <Section title="TOOLS">
           <Row icon={BookOpen} color="#6366f1" label="Notes" value={`${notes.length} notes`} onPress={() => router.push('/notes')} />
-          <Row icon={Timer} color="#f59e0b" label="Focus Timer" onPress={() => router.push('/focus')} last />
+          <Row icon={Timer} color="#f59e0b" label="Focus Timer" onPress={() => router.push('/focus')} />
+          <Row icon={TrendingUp} color="#10b981" label="Grade Calculator" onPress={() => router.push('/settings/grades')} last />
         </Section>
 
         <Section title="ABOUT">

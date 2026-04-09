@@ -77,7 +77,7 @@ export default function CanvasScreen() {
             </Text>
 
             {/* How to get token */}
-            <View style={styles.steps}>
+            <View style={[styles.steps, { backgroundColor: colors.bg }]}>
               <Text style={styles.stepsTitle}>How to get your token:</Text>
               {[
                 'Go to bc.instructure.com',
@@ -190,7 +190,7 @@ export default function CanvasScreen() {
       {/* Token Modal */}
       {showModal && (
         <View style={styles.overlay}>
-          <View style={styles.modal}>
+          <View style={[styles.modal, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Paste Your Canvas Token</Text>
               <TouchableOpacity onPress={() => { setShowModal(false); setToken(''); setConnectError(''); }}>
@@ -203,7 +203,7 @@ export default function CanvasScreen() {
             </Text>
 
             <TextInput
-              style={styles.tokenInput}
+              style={[styles.tokenInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg }]}
               placeholder="Paste token here..."
               placeholderTextColor={colors.textTertiary}
               value={token}
