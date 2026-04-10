@@ -1,273 +1,458 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, FileText, BookOpen, HelpCircle, PenTool, Shield, Copy } from 'lucide-react-native';
+import { Zap, Copy, Send, RotateCcw, Upload } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Card, Button, Badge } from '../../components/ui';
+import { useRouter } from 'expo-router';
+import { Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
-import { useColors, colors } from '../../lib/theme';
-import { showAlert } from '../../utils/helpers';
+import { useColors } from '../../lib/theme';
+import { useAuthStore } from '../../store/auth';
+import { initials } from '../../utils/helpers';
 import { claude } from '../../lib/claude';
 import { gptzero } from '../../lib/gptzero';
 
-const hasApiKey = !!process.env.EXPO_PUBLIC_CLAUDE_API_KEY && process.env.EXPO_PUBLIC_CLAUDE_API_KEY !== 'sk-ant-your-key-here';
-
 type Tool = 'summarize' | 'explain' | 'flashcards' | 'quiz' | 'studyGuide' | 'writing' | 'aiCheck';
+type Msg  = { role: 'user' | 'assistant'; text: string };
 
-const TOOLS = [
-  { id: 'summarize', label: 'Summarize', icon: FileText, color: '#6366f1' },
-  { id: 'explain', label: 'Explain', icon: BookOpen, color: '#10b981' },
-  { id: 'flashcards', label: 'Flashcards', icon: Zap, color: '#8b5cf6' },
-  { id: 'quiz', label: 'Quiz', icon: HelpCircle, color: '#f59e0b' },
-  { id: 'studyGuide', label: 'Study Guide', icon: FileText, color: '#3b82f6' },
-  { id: 'writing', label: 'Writing', icon: PenTool, color: '#ec4899' },
-  { id: 'aiCheck', label: 'AI Checker', icon: Shield, color: '#64748b' },
-] as const;
+const TOOLS: { id: Tool; label: string; color: string }[] = [
+  { id: 'summarize',  label: 'Summarize',   color: '#6366f1' },
+  { id: 'explain',    label: 'Explain',     color: '#10b981' },
+  { id: 'flashcards', label: 'Flashcards',  color: '#8b5cf6' },
+  { id: 'quiz',       label: 'Quiz',        color: '#f59e0b' },
+  { id: 'studyGuide', label: 'Study Guide', color: '#3b82f6' },
+  { id: 'writing',    label: 'Writing',     color: '#ec4899' },
+  { id: 'aiCheck',    label: 'AI Checker',  color: '#64748b' },
+];
+
+const NAV = [
+  { label: 'Home',     path: '/home'       },
+  { label: 'Notes',    path: '/notes'      },
+  { label: 'Tasks',    path: '/tasks'      },
+  { label: 'AI',       path: '/ai-studio', active: true },
+  { label: 'Settings', path: '/settings'   },
+];
+
+/* Native HTML inputs — avoids GestureHandler swallowing keystrokes on web */
+function NativeInput({ value, onChange, placeholder, multiline = false, onEnter, inputStyle }: any) {
+  const base: any = {
+    background: 'transparent', border: 'none', outline: 'none',
+    fontFamily: 'inherit', fontSize: 14, lineHeight: '22px',
+    color: 'inherit', width: '100%', padding: 0, margin: 0,
+  };
+  if (multiline) {
+    return (
+      <textarea value={value} onChange={(e: any) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...base, resize: 'none', height: '100%', minHeight: 120, ...inputStyle }} />
+    );
+  }
+  return (
+    <input value={value} onChange={(e: any) => onChange(e.target.value)}
+      placeholder={placeholder}
+      onKeyDown={(e: any) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onEnter?.(); } }}
+      style={{ ...base, ...inputStyle }} />
+  );
+}
 
 export default function AIStudioScreen() {
-  const colors = useColors();
-  const [tool, setTool] = useState<Tool>('summarize');
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [output, setOutput] = useState('');
+  const colors  = useColors();
+  const router  = useRouter();
+  const { user }= useAuthStore();
+  const isWeb   = Platform.OS === 'web';
+
+  const [tool,      setTool]      = useState<Tool>('summarize');
+  const [content,   setContent]   = useState('');
+  const [chatInput, setChatInput] = useState('');
+  const [msgs,      setMsgs]      = useState<Msg[]>([]);
+  const [loading,   setLoading]   = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const [canvasText, setCanvasText] = useState('');
   const [flashcards, setFlashcards] = useState<{front:string;back:string}[]>([]);
-  const [quiz, setQuiz] = useState<{question:string;options:string[];correct:number;explanation:string}[]>([]);
-  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number,number>>({});
-  const [showAnswers, setShowAnswers] = useState<Record<number,boolean>>({});
-  const [summaryLen, setSummaryLen] = useState<'short'|'medium'|'long'>('medium');
-  const [explainLevel, setExplainLevel] = useState<'beginner'|'intermediate'|'advanced'>('beginner');
-  const [cardCount, setCardCount] = useState(5);
-  const [quizCount, setQuizCount] = useState(5);
-  const [writingStyle, setWritingStyle] = useState<'clarity'|'formal'|'concise'|'humanize'>('clarity');
-  const [aiCheckResult, setAiCheckResult] = useState<any>(null);
+  const [quiz,       setQuiz]       = useState<{question:string;options:string[];correct:number;explanation:string}[]>([]);
+  const [aiResult,   setAiResult]   = useState<any>(null);
+  const [flipped,    setFlipped]    = useState<Set<number>>(new Set());
+  const [selAns,     setSelAns]     = useState<Record<number,number>>({});
+  const [shownAns,   setShownAns]   = useState<Record<number,boolean>>({});
 
-  const currentTool = TOOLS.find(t => t.id === tool)!;
+  const [summaryLen,  setSummaryLen]  = useState<'short'|'medium'|'long'>('medium');
+  const [explainLvl,  setExplainLvl]  = useState<'beginner'|'intermediate'|'advanced'>('beginner');
+  const [cardCount,   setCardCount]   = useState(5);
+  const [quizCount,   setQuizCount]   = useState(5);
+  const [writeStyle,  setWriteStyle]  = useState<'clarity'|'formal'|'concise'|'humanize'>('clarity');
 
-  const clear = () => { setOutput(''); setFlashcards([]); setQuiz([]); setFlippedCards(new Set()); setSelectedAnswers({}); setShowAnswers({}); setAiCheckResult(null); };
+  const chatRef    = useRef<ScrollView>(null);
+  const dragCount  = useRef(0); // prevents flicker when entering child elements
+  const scroll     = () => setTimeout(() => chatRef.current?.scrollToEnd({ animated: true }), 80);
+  const cur        = TOOLS.find(t => t.id === tool)!;
 
-  const run = async () => {
-    if (!input.trim()) { showAlert('Input required', 'Please paste some text first.'); return; }
-    setLoading(true); clear();
+  const clearCanvas = () => {
+    setCanvasText(''); setFlashcards([]); setQuiz([]); setAiResult(null);
+    setFlipped(new Set()); setSelAns({}); setShownAns({});
+  };
+
+  const errMsg = (e: any) => e.message?.includes('fetch')
+    ? 'Proxy unreachable. Run: node canvas-proxy.js\nthen: npx expo start --web --clear'
+    : e.message || 'Something went wrong.';
+
+  /* Core generate — accepts optional text so drag-drop can pass file content */
+  const generateWith = async (src: string) => {
+    if (!src.trim()) return;
+    const next: Msg[] = [...msgs, { role: 'user', text: `Generate ${cur.label}` }];
+    setMsgs(next); setLoading(true); clearCanvas(); scroll();
     try {
-      if (tool === 'summarize') setOutput(await claude.summarize(input, summaryLen));
-      else if (tool === 'explain') setOutput(await claude.explainSimply(input, explainLevel));
-      else if (tool === 'flashcards') setFlashcards(await claude.generateFlashcards(input, cardCount));
-      else if (tool === 'quiz') setQuiz(await claude.generateQuiz(input, quizCount));
-      else if (tool === 'studyGuide') setOutput(await claude.generateStudyGuide(input));
-      else if (tool === 'writing') setOutput(await claude.improveWriting(input, writingStyle));
-      else if (tool === 'aiCheck') { const result = await gptzero.check(input); setAiCheckResult(result); }
+      let reply = '';
+      if (tool === 'summarize')  { reply = await claude.summarize(src, summaryLen);          setCanvasText(reply); }
+      if (tool === 'explain')    { reply = await claude.explainSimply(src, explainLvl);       setCanvasText(reply); }
+      if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount); setFlashcards(c); reply = `${c.length} flashcards ready.`; }
+      if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);       setQuiz(q);       reply = `${q.length} questions ready.`; }
+      if (tool === 'studyGuide') { reply = await claude.generateStudyGuide(src);              setCanvasText(reply); }
+      if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle);      setCanvasText(reply); }
+      if (tool === 'aiCheck')    { const r = await gptzero.check(src);                        setAiResult(r);   reply = `${Math.round(r.score*100)}% AI — ${r.label}`; }
+      setMsgs([...next, { role: 'assistant', text: reply }]);
     } catch(e: any) {
-      showAlert('Error', e.message || 'Something went wrong. Check your API key in .env');
-    } finally { setLoading(false); }
+      setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e) }]);
+    } finally { setLoading(false); scroll(); }
   };
 
-  const copy = async (text: string) => {
-    await Clipboard.setStringAsync(text);
-    if (Platform.OS === 'web') window.alert('Copied to clipboard!');
-    else showAlert('Copied!', 'Text copied to clipboard.');
+  const generate = () => generateWith(content);
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || loading) return;
+    const q = chatInput.trim();
+    const ctx = content ? `Context:\n${content}\n\n` : canvasText ? `Context:\n${canvasText}\n\n` : '';
+    const next: Msg[] = [...msgs, { role: 'user', text: q }];
+    setMsgs(next); setChatInput(''); setLoading(true); scroll();
+    try {
+      const r = await claude.explainSimply(`${ctx}${q}`, 'intermediate');
+      setMsgs([...next, { role: 'assistant', text: r }]);
+    } catch(e: any) {
+      setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e) }]);
+    } finally { setLoading(false); scroll(); }
   };
 
-  const OptBtn = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
+  /* Drag and drop handlers (web only) */
+  const onDragEnter = (e: any) => { e.preventDefault(); dragCount.current++; setIsDragging(true); };
+  const onDragLeave = (e: any) => { e.preventDefault(); dragCount.current--; if (dragCount.current <= 0) { dragCount.current = 0; setIsDragging(false); } };
+  const onDragOver  = (e: any) => { e.preventDefault(); };
+  const onDrop      = (e: any) => {
+    e.preventDefault(); dragCount.current = 0; setIsDragging(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const text = (ev.target?.result as string) || '';
+      setContent(text);
+      await generateWith(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const Pill = ({ label, active, onPress }: any) => (
     <TouchableOpacity onPress={onPress}
-      style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 0.5,
-        backgroundColor: active ? colors.primary : colors.bg, borderColor: active ? colors.primary : colors.border }}>
-      <Text style={{ fontSize: 12, fontWeight: '500', color: active ? '#fff' : colors.textSecondary }}>{label}</Text>
+      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1,
+        borderColor: active ? cur.color : colors.border,
+        backgroundColor: active ? cur.color : 'transparent' }}>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : colors.textSecondary }}>{label}</Text>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {/* Header */}
-        <View style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Zap size={22} color={colors.accent} />
-            <Text style={{ fontSize: 24, fontWeight: '800', color: colors.text }}>AI Studio</Text>
+
+      {/* ── Header ── */}
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={[styles.logoBox, { backgroundColor: colors.primary }]}>
+            <Zap size={16} color="#fff" fill="#fff" />
           </View>
-          <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>Powered by Claude</Text>
+          <View>
+            <Text style={[styles.logoName, { color: colors.text }]}>AI Studio</Text>
+            <Text style={[styles.logoSub, { color: colors.textTertiary }]}>Powered by Claude</Text>
+          </View>
         </View>
 
-        {/* API key warning */}
-        {!hasApiKey && (
-          <View style={{ backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#f59e0b', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-            <Text style={{ fontSize: 13, color: '#92400e', lineHeight: 20 }}>
-              ⚠️ Claude API key not configured. Add your key to the <Text style={{ fontWeight: '700' }}>.env</Text> file:{'\n'}
-              <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>EXPO_PUBLIC_CLAUDE_API_KEY=sk-ant-...</Text>
-            </Text>
-          </View>
-        )}
-
-        {/* Tool selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>
-          {TOOLS.map(t => (
-            <TouchableOpacity key={t.id} onPress={() => { setTool(t.id as Tool); clear(); }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1,
-                backgroundColor: tool === t.id ? t.color : colors.card,
-                borderColor: tool === t.id ? t.color : colors.border }}>
-              <t.icon size={16} color={tool === t.id ? '#fff' : t.color} />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: tool === t.id ? '#fff' : t.color }}>{t.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Input card */}
-        <Card style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 8 }}>Your content</Text>
-          <TextInput
-            style={{ borderWidth: 0.5, borderColor: colors.border, borderRadius: 10, padding: 12, minHeight: 120,
-              color: colors.text, fontSize: 14, textAlignVertical: 'top', marginBottom: 12,
-              backgroundColor: colors.bg, ...(Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}) }}
-            placeholder="Paste your notes, text, or study material here..."
-            placeholderTextColor={colors.textTertiary}
-            value={input} onChangeText={setInput} multiline
-          />
-
-          {/* Options */}
-          {tool === 'summarize' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>Length:</Text>
-              {(['short','medium','long'] as const).map(l => <OptBtn key={l} label={l} active={summaryLen === l} onPress={() => setSummaryLen(l)} />)}
-            </View>
-          )}
-          {tool === 'explain' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>Level:</Text>
-              {(['beginner','intermediate','advanced'] as const).map(l => <OptBtn key={l} label={l} active={explainLevel === l} onPress={() => setExplainLevel(l)} />)}
-            </View>
-          )}
-          {tool === 'flashcards' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>Cards:</Text>
-              {[3,5,8,10].map(n => <OptBtn key={n} label={String(n)} active={cardCount === n} onPress={() => setCardCount(n)} />)}
-            </View>
-          )}
-          {tool === 'quiz' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>Questions:</Text>
-              {[3,5,10].map(n => <OptBtn key={n} label={String(n)} active={quizCount === n} onPress={() => setQuizCount(n)} />)}
-            </View>
-          )}
-          {tool === 'writing' && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' }}>Style:</Text>
-              {(['clarity','formal','concise','humanize'] as const).map(s => <OptBtn key={s} label={s} active={writingStyle === s} onPress={() => setWritingStyle(s)} />)}
-            </View>
-          )}
-          {tool === 'aiCheck' && (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.bg, borderRadius: 8, padding: 10, marginBottom: 8 }}>
-              <Shield size={12} color={colors.textTertiary} />
-              <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16, flex: 1 }}>AI detectors are imperfect. Results are estimates, not proof.</Text>
-            </View>
-          )}
-
-          <Button variant="primary" onPress={run} loading={loading} fullWidth style={{ marginTop: 4 }}>
-            {loading ? 'Generating with Claude...' : `Generate ${currentTool.label}`}
-          </Button>
-        </Card>
-
-        {/* Text output */}
-        {output !== '' && (
-          <Card style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Zap size={14} color={colors.accent} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>Result</Text>
-              </View>
-              <TouchableOpacity onPress={() => copy(output)} style={{ padding: 6 }}>
-                <Copy size={14} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 14, color: colors.text, lineHeight: 22 }}>{output}</Text>
-          </Card>
-        )}
-
-        {/* Flashcards */}
-        {flashcards.length > 0 && (
-          <View>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 10 }}>{flashcards.length} Flashcards</Text>
-            {flashcards.map((card, i) => (
-              <TouchableOpacity key={i} onPress={() => {
-                const s = new Set(flippedCards); s.has(i) ? s.delete(i) : s.add(i); setFlippedCards(s);
-              }}>
-                <Card style={{ marginBottom: 10, alignItems: 'center', paddingVertical: 24 }}>
-                  <Badge variant={flippedCards.has(i) ? 'success' : 'primary'} size="sm">{flippedCards.has(i) ? 'Answer' : 'Question'}</Badge>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, textAlign: 'center', marginTop: 10, marginBottom: 6 }}>
-                    {flippedCards.has(i) ? card.back : card.front}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: colors.textTertiary }}>Tap to {flippedCards.has(i) ? 'see question' : 'reveal answer'}</Text>
-                </Card>
+        {isWeb && (
+          <View style={styles.navRow}>
+            {NAV.map(n => (
+              <TouchableOpacity key={n.label} onPress={() => router.push(n.path as any)}>
+                <Text style={[styles.navLink, { color: n.active ? colors.primary : colors.textSecondary },
+                  n.active && { fontWeight: '700' }]}>{n.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
-        {/* Quiz */}
-        {quiz.length > 0 && (
-          <View>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 10 }}>{quiz.length} Quiz Questions</Text>
+        <TouchableOpacity onPress={() => router.push('/settings')}
+          style={[styles.avatar, { backgroundColor: colors.primary }]}>
+          <Text style={styles.avatarTxt}>{initials(user?.name || 'S')}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Body (drag target wrapper) ── */}
+      <View style={{ flex: 1, flexDirection: 'row' }}
+        {...(isWeb ? { onDragEnter, onDragLeave, onDragOver, onDrop } : {})}>
+
+        {/* ─── LEFT: Claude Output ─── */}
+        <View style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRightWidth: 0.5, borderRightColor: colors.border }}>
+          {/* Panel header */}
+          <View style={[styles.panelHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: cur.color }} />
+              <Text style={[styles.panelLabel, { color: colors.textTertiary }]}>CLAUDE OUTPUT</Text>
+            </View>
+            {msgs.length > 0 && (
+              <TouchableOpacity onPress={() => { setMsgs([]); clearCanvas(); }}
+                style={[styles.clearBtn, { borderColor: colors.border }]}>
+                <RotateCcw size={11} color={colors.textTertiary} />
+                <Text style={{ fontSize: 11, color: colors.textTertiary }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Messages + results */}
+          <ScrollView ref={chatRef} style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1, gap: 10, padding: 16, paddingBottom: 12 }}>
+
+            {msgs.length === 0 && !loading && (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIcon, { backgroundColor: cur.color + '20' }]}>
+                  <Zap size={28} color={cur.color} fill={cur.color} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>Ready to generate</Text>
+                <Text style={[styles.emptyDesc, { color: colors.textTertiary }]}>
+                  Paste content on the right and click Generate,{'\n'}or drag & drop a file anywhere
+                </Text>
+              </View>
+            )}
+
+            {msgs.map((m, i) => (
+              <View key={i} style={[styles.bubble,
+                m.role === 'user'
+                  ? { backgroundColor: cur.color, alignSelf: 'flex-end' as any, maxWidth: '85%' }
+                  : [styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]]}>
+                {m.role === 'assistant' && <Text style={[styles.bubbleLbl, { color: cur.color }]}>Claude</Text>}
+                <Text style={[styles.bubbleTxt, { color: m.role === 'user' ? '#fff' : colors.text }]}>{m.text}</Text>
+              </View>
+            ))}
+
+            {/* Inline results */}
+            {canvasText !== '' && (
+              <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={[styles.bubbleLbl, { color: cur.color }]}>{cur.label}</Text>
+                  <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(canvasText); }}>
+                    <Copy size={12} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ color: colors.text, fontSize: 13, lineHeight: 20 }}>{canvasText}</Text>
+              </View>
+            )}
+
+            {flashcards.map((card, i) => (
+              <TouchableOpacity key={i} onPress={() => { const f = new Set(flipped); f.has(i)?f.delete(i):f.add(i); setFlipped(f); }}>
+                <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: flipped.has(i) ? colors.success : colors.border }]}>
+                  <Text style={[styles.bubbleLbl, { color: flipped.has(i) ? colors.success : cur.color }]}>{flipped.has(i) ? 'Answer' : 'Question'}</Text>
+                  <Text style={{ color: colors.text, fontSize: 13 }}>{flipped.has(i) ? card.back : card.front}</Text>
+                  <Text style={{ color: colors.textTertiary, fontSize: 11, marginTop: 4 }}>Tap to flip</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+
             {quiz.map((q, qi) => (
-              <Card key={qi} style={{ marginBottom: 12 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 10, lineHeight: 20 }}>Q{qi+1}: {q.question}</Text>
+              <View key={qi} style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.bubbleLbl, { color: cur.color }]}>Q{qi+1}</Text>
+                <Text style={{ color: colors.text, fontSize: 13, marginBottom: 8 }}>{q.question}</Text>
                 {q.options.map((opt, oi) => {
-                  const selected = selectedAnswers[qi] === oi;
-                  const revealed = showAnswers[qi];
-                  const isCorrect = oi === q.correct;
-                  let bg = colors.card; let border = colors.border;
-                  if (revealed && isCorrect) { bg = '#d1fae5'; border = colors.success; }
-                  else if (revealed && selected && !isCorrect) { bg = '#fee2e2'; border = colors.error; }
-                  else if (selected) { bg = colors.primaryLight; border = colors.primary; }
+                  const sel=selAns[qi]===oi; const rev=shownAns[qi]; const ok=oi===q.correct;
+                  const bg = rev&&ok ? colors.success+'20' : rev&&sel&&!ok ? colors.error+'20' : sel ? colors.primaryLight : colors.bg;
+                  const bc = rev&&ok ? colors.success : rev&&sel&&!ok ? colors.error : sel ? cur.color : colors.border;
                   return (
-                    <TouchableOpacity key={oi} onPress={() => !showAnswers[qi] && setSelectedAnswers({...selectedAnswers,[qi]:oi})}
-                      style={{ borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 6, backgroundColor: bg, borderColor: border }}>
-                      <Text style={{ fontSize: 13, color: colors.text }}>{String.fromCharCode(65+oi)}. {opt}</Text>
+                    <TouchableOpacity key={oi} disabled={!!shownAns[qi]} onPress={()=>setSelAns({...selAns,[qi]:oi})}
+                      style={{ borderWidth:1, borderRadius:8, padding:8, marginBottom:4, backgroundColor:bg, borderColor:bc }}>
+                      <Text style={{ fontSize:12, color:colors.text }}>{String.fromCharCode(65+oi)}. {opt}</Text>
                     </TouchableOpacity>
                   );
                 })}
-                {selectedAnswers[qi] !== undefined && !showAnswers[qi] && (
-                  <TouchableOpacity onPress={() => setShowAnswers({...showAnswers,[qi]:true})} style={{ marginTop: 8, alignItems: 'center', padding: 8 }}>
-                    <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13 }}>Show Answer</Text>
+                {selAns[qi]!==undefined && !shownAns[qi] && (
+                  <TouchableOpacity onPress={()=>setShownAns({...shownAns,[qi]:true})}>
+                    <Text style={{ color:cur.color, fontSize:12, fontWeight:'600', marginTop:4 }}>Show Answer</Text>
                   </TouchableOpacity>
                 )}
-                {showAnswers[qi] && (
-                  <View style={{ backgroundColor: colors.success + '15', borderRadius: 8, padding: 10, marginTop: 6 }}>
-                    <Text style={{ fontSize: 13, color: colors.success, lineHeight: 18 }}>✓ {q.explanation}</Text>
-                  </View>
-                )}
-              </Card>
+                {shownAns[qi] && <Text style={{ color:colors.success, fontSize:12, marginTop:4 }}>✓ {q.explanation}</Text>}
+              </View>
             ))}
-          </View>
-        )}
 
-        {/* AI Check Result */}
-        {aiCheckResult && (
-          <Card style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Shield size={20} color={aiCheckResult.label === 'HUMAN' ? colors.success : aiCheckResult.label === 'AI' ? colors.error : colors.warning} />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>AI Detection Result</Text>
+            {aiResult && (
+              <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}>
+                <Text style={[styles.bubbleLbl, { color: cur.color }]}>AI Detection</Text>
+                <Text style={{ fontSize:40, fontWeight:'800', color: aiResult.score>0.7?colors.error:aiResult.score>0.3?colors.warning:colors.success }}>
+                  {Math.round(aiResult.score*100)}%
+                </Text>
+                <Badge variant={aiResult.label==='HUMAN'?'success':aiResult.label==='AI'?'error':'warning'}>{aiResult.label}</Badge>
+              </View>
+            )}
+
+            {loading && (
+              <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.bubbleLbl, { color: cur.color }]}>Claude</Text>
+                <ActivityIndicator size="small" color={cur.color} style={{ alignSelf: 'flex-start' }} />
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Chat input at bottom of output panel */}
+          <View style={[styles.chatRow, { borderTopColor: colors.border, backgroundColor: colors.card }]}>
+            <View style={{ flex: 1, color: colors.text } as any}>
+              {isWeb && (
+                <NativeInput value={chatInput} onChange={setChatInput} onEnter={sendChat}
+                  placeholder="Ask Claude a follow-up…"
+                  inputStyle={{ color: colors.text }} />
+              )}
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <Text style={{ fontSize: 14, color: colors.textSecondary }}>AI Probability</Text>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: aiCheckResult.score > 0.7 ? colors.error : aiCheckResult.score > 0.3 ? colors.warning : colors.success }}>
-                {Math.round(aiCheckResult.score * 100)}%
+            <TouchableOpacity onPress={sendChat} disabled={loading || !chatInput.trim()}
+              style={[styles.sendBtn, { backgroundColor: chatInput.trim() ? cur.color : colors.border }]}>
+              <Send size={13} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ─── RIGHT: Input Panel ─── */}
+        <View style={{ width: 360, display: 'flex', flexDirection: 'column' }}>
+          {/* Tool picker */}
+          <View style={[styles.toolBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 14, paddingVertical: 10 }}>
+              {TOOLS.map(t => (
+                <TouchableOpacity key={t.id} onPress={() => { setTool(t.id); clearCanvas(); }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
+                    borderColor: tool === t.id ? t.color : colors.border,
+                    backgroundColor: tool === t.id ? t.color : 'transparent' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: tool === t.id ? '#fff' : colors.textSecondary }}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Textarea area */}
+          <View style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Text style={[styles.panelLabel, { color: colors.textTertiary }]}>YOUR CONTENT</Text>
+
+            <View style={[styles.textareaBox, { backgroundColor: colors.bg, borderColor: colors.border, flex: 1 }]}>
+              {isWeb && (
+                <NativeInput value={content} onChange={setContent}
+                  placeholder={`Paste your notes, text, or study material here…\n\nOr drag & drop a .txt or .md file onto the window.`}
+                  multiline
+                  inputStyle={{ color: colors.text, minHeight: 120 }} />
+              )}
+            </View>
+
+            {/* File upload hint */}
+            <View style={[styles.dropHint, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+              <Upload size={13} color={colors.textTertiary} />
+              <Text style={{ fontSize: 12, color: colors.textTertiary }}>Drag & drop a file anywhere to auto-analyze</Text>
+            </View>
+
+            {/* Options row */}
+            <View style={[styles.optRow, { flexShrink: 0 }]}>
+              {tool === 'summarize' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Length:</Text>
+                {(['short','medium','long'] as const).map(l => <Pill key={l} label={l} active={summaryLen===l} onPress={()=>setSummaryLen(l)} />)}
+              </>)}
+              {tool === 'explain' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Level:</Text>
+                {(['beginner','intermediate','advanced'] as const).map(l => <Pill key={l} label={l} active={explainLvl===l} onPress={()=>setExplainLvl(l)} />)}
+              </>)}
+              {tool === 'flashcards' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Cards:</Text>
+                {[3,5,8,10].map(n => <Pill key={n} label={`${n}`} active={cardCount===n} onPress={()=>setCardCount(n)} />)}
+              </>)}
+              {tool === 'quiz' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Questions:</Text>
+                {[3,5,10].map(n => <Pill key={n} label={`${n}`} active={quizCount===n} onPress={()=>setQuizCount(n)} />)}
+              </>)}
+              {tool === 'writing' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Style:</Text>
+                {(['clarity','formal','concise','humanize'] as const).map(o => <Pill key={o} label={o} active={writeStyle===o} onPress={()=>setWriteStyle(o)} />)}
+              </>)}
+            </View>
+
+            {/* Generate button */}
+            <TouchableOpacity onPress={generate} disabled={loading || !content.trim()}
+              style={[styles.genBtn, { backgroundColor: content.trim() ? cur.color : colors.border }]}>
+              {loading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.genTxt}>Generate {cur.label}</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ─── Drag overlay (web only) ─── */}
+        {isWeb && isDragging && (
+          <View style={[styles.dragOverlay]}
+            {...{ onDragOver, onDrop, onDragLeave }}>
+            <View style={[styles.dragBox, { borderColor: colors.primary, backgroundColor: colors.card }]}>
+              <View style={[styles.dragIconWrap, { backgroundColor: colors.primary + '20' }]}>
+                <Upload size={40} color={colors.primary} />
+              </View>
+              <Text style={[styles.dragTitle, { color: colors.text }]}>Drop your file here</Text>
+              <Text style={[styles.dragSub, { color: colors.textTertiary }]}>
+                .txt, .md, or any plain-text file{'\n'}Claude will analyze it automatically
               </Text>
             </View>
-            <Badge variant={aiCheckResult.label === 'HUMAN' ? 'success' : aiCheckResult.label === 'AI' ? 'error' : 'warning'}>
-              {aiCheckResult.label}
-            </Badge>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: colors.bg, borderRadius: 8, padding: 10, marginTop: 10 }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 16, flex: 1 }}>⚠️ AI detectors are not 100% accurate and can produce false positives. Use this as a guide only.</Text>
-            </View>
-          </Card>
+          </View>
         )}
+      </View>
 
-        <TabBar />
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      <TabBar />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
+  header:      { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:20, paddingVertical:10, borderBottomWidth:0.5 },
+  logoBox:     { width:34, height:34, borderRadius:9, alignItems:'center', justifyContent:'center' },
+  logoName:    { fontSize:15, fontWeight:'800' },
+  logoSub:     { fontSize:10 },
+  navRow:      { flexDirection:'row', alignItems:'center', gap:24 },
+  navLink:     { fontSize:14, fontWeight:'500' },
+  avatar:      { width:32, height:32, borderRadius:16, alignItems:'center', justifyContent:'center' },
+  avatarTxt:   { color:'#fff', fontSize:13, fontWeight:'700' },
+  toolBar:     { borderBottomWidth:0.5 },
+  panelHeader: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:10, borderBottomWidth:0.5 },
+  panelLabel:  { fontSize:11, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.8 },
+  textareaBox: { borderWidth:0.5, borderRadius:12, padding:14 },
+  dropHint:    { flexDirection:'row', alignItems:'center', gap:6, borderWidth:1, borderStyle:'dashed' as any, borderRadius:8, padding:10 },
+  optRow:      { flexDirection:'row', alignItems:'center', flexWrap:'wrap', gap:8 },
+  optLabel:    { fontSize:13, fontWeight:'500' },
+  genBtn:      { paddingVertical:12, borderRadius:12, alignItems:'center', justifyContent:'center' },
+  genTxt:      { color:'#fff', fontWeight:'700', fontSize:15 },
+  bubble:      { borderRadius:10, padding:10 },
+  aiBubble:    { borderWidth:0.5, borderRadius:10, padding:10 },
+  bubbleLbl:   { fontSize:10, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.5, marginBottom:4 },
+  bubbleTxt:   { fontSize:13, lineHeight:19 },
+  clearBtn:    { flexDirection:'row', alignItems:'center', gap:4, paddingHorizontal:8, paddingVertical:4, borderRadius:6, borderWidth:0.5 },
+  chatRow:     { flexDirection:'row', alignItems:'center', gap:8, paddingHorizontal:16, paddingVertical:10, borderTopWidth:0.5 },
+  sendBtn:     { width:28, height:28, borderRadius:14, alignItems:'center', justifyContent:'center', flexShrink:0 },
+  emptyState:  { flex:1, alignItems:'center', justifyContent:'center', paddingVertical:60 },
+  emptyIcon:   { width:64, height:64, borderRadius:20, alignItems:'center', justifyContent:'center', marginBottom:14 },
+  emptyTitle:  { fontSize:16, fontWeight:'700', marginBottom:6 },
+  emptyDesc:   { fontSize:13, textAlign:'center', lineHeight:20 },
+  dragOverlay: {
+    position:'absolute' as any, top:0, left:0, right:0, bottom:0,
+    backgroundColor:'rgba(0,0,0,0.55)',
+    alignItems:'center', justifyContent:'center',
+    zIndex: 99,
+  },
+  dragBox: {
+    alignItems:'center', gap:14, padding:48, borderRadius:24,
+    borderWidth:2, borderStyle:'dashed' as any,
+    shadowOffset:{ width:0, height:8 }, shadowOpacity:0.2, shadowRadius:24,
+  },
+  dragIconWrap: { width:80, height:80, borderRadius:24, alignItems:'center', justifyContent:'center' },
+  dragTitle:   { fontSize:22, fontWeight:'800' },
+  dragSub:     { fontSize:14, textAlign:'center', lineHeight:22 },
 });

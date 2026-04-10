@@ -1,4 +1,11 @@
-const API = 'https://api.anthropic.com/v1/messages';
+import { Platform } from 'react-native';
+
+// On web, route through local proxy to bypass CORS.
+// On native (iOS/Android), call the API directly.
+const API = Platform.OS === 'web'
+  ? 'http://localhost:3001/claude/messages'
+  : 'https://api.anthropic.com/v1/messages';
+
 const MODEL = 'claude-sonnet-4-20250514';
 
 async function call(system: string, user: string, maxTokens = 2048): Promise<string> {
