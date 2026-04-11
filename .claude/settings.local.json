@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx expo:*)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(git:*)",
+      "Bash(node canvas-proxy.js)"
     ]
   }
 }
