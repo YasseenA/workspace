@@ -68,8 +68,11 @@ export const claude = {
       `Create a comprehensive study guide with key concepts, terms, main ideas, and review questions:\n\n${text}`, 3000),
 
   improveWriting: (text: string, style: 'clarity'|'formal'|'concise'|'humanize') => {
-    const instructions = { clarity: 'Rewrite for maximum clarity.', formal: 'Rewrite in formal academic tone.', concise: 'Rewrite to be as concise as possible.', humanize: 'Rewrite to sound natural and human.' };
-    return call('You are an expert writing coach. Return ONLY the rewritten text.', `${instructions[style]}\n\nText:\n${text}`);
+    const styleDesc = { clarity: 'clear and easy to understand', formal: 'formal and academic', concise: 'concise and to-the-point', humanize: 'natural and human-sounding' };
+    return call(
+      `You are an expert writing assistant. If the input is a writing request or prompt, fulfill it and write the content. If the input is existing text to improve, rewrite it. Either way, return ONLY the final written content — no explanations, no preamble.`,
+      `Style: ${styleDesc[style]}\n\nInput:\n${text}`
+    );
   },
 
   parseSyllabus: async (text: string): Promise<{dates:string[];exams:string[];assignments:string[];books:string[];officeHours:string;gradingPolicy:string}> => {
