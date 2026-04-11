@@ -5,6 +5,7 @@ export interface Note {
   id: string; title: string; content: string; excerpt: string;
   notebookId: string; tags: string[]; isPinned: boolean; isFavorite: boolean;
   wordCount: number; createdAt: string; updatedAt: string;
+  images?: string[];
 }
 export interface Notebook {
   id: string; name: string; color: string; icon: string; noteCount: number;

@@ -28,6 +28,7 @@ export default function NoteEditorScreen() {
   const [aiMode, setAiMode] = useState<'summarize'|'explain'|'studyGuide'|null>(null);
   const [noteId, setNoteId] = useState(id || '');
   const [mode, setMode] = useState<EditorMode>('write');
+  const [images, setImages] = useState<string[]>(existingNote?.images || []);
 
   // Drawing state (web only)
   const canvasRef = useRef<any>(null);
@@ -91,9 +92,8 @@ export default function NoteEditorScreen() {
   const insertDrawing = () => {
     if (!canvasRef.current) return;
     const dataUrl = canvasRef.current.toDataURL('image/png');
-    setContent(c => c + `\n\n[Drawing: ${dataUrl}]\n`);
+    setImages(prev => [...prev, dataUrl]);
     setMode('write');
-    showAlert('Drawing inserted', 'Your sketch has been added to the note.');
   };
 
   const handleSave = async () => {
@@ -101,9 +101,9 @@ export default function NoteEditorScreen() {
     setIsSaving(true);
     try {
       if (existingNote || noteId) {
-        updateNote(noteId || existingNote!.id, { title, content, tags });
+        updateNote(noteId || existingNote!.id, { title, content, tags, images });
       } else {
-        const note = createNote({ title, content, tags });
+        const note = createNote({ title, content, tags, images });
         setNoteId(note.id);
       }
       router.back();
@@ -230,6 +230,30 @@ export default function NoteEditorScreen() {
                 placeholder="Start writing your note..." placeholderTextColor={colors.textTertiary}
                 value={content} onChangeText={setContent} multiline scrollEnabled={false} textAlignVertical="top"
               />
+
+              {/* Inserted drawings — rendered as real images */}
+              {images.length > 0 && (
+                <View style={{ gap: 12, marginTop: 16 }}>
+                  {images.map((src, i) => (
+                    <View key={i} style={{ position: 'relative' }}>
+                      {Platform.OS === 'web' ? (
+                        // @ts-ignore
+                        <img
+                          src={src}
+                          alt={`Drawing ${i + 1}`}
+                          style={{ width: '100%', borderRadius: 12, display: 'block', border: `1px solid ${colors.border}` } as any}
+                        />
+                      ) : null}
+                      <TouchableOpacity
+                        onPress={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
+                        style={[styles.imgDeleteBtn, { backgroundColor: colors.error }]}
+                      >
+                        <Trash2 size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
             </ScrollView>
           </>
         ) : (
@@ -299,4 +323,5 @@ const styles = StyleSheet.create({
   sizeBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   toolBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   insertBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginLeft: 8 },
+  imgDeleteBtn: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 });
