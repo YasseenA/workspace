@@ -5,7 +5,11 @@
       "Bash(node -e ':*)",
       "Bash(git:*)",
       "Bash(node canvas-proxy.js)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8081)",
+      "Bash(taskkill:*)",
+      "Bash(cmd:*)"
     ]
   }
 }

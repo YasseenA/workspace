@@ -67,6 +67,11 @@ export default function RegisterScreen() {
         router.replace('/onboarding');
       }
     } catch (e: any) {
+      const errCode = e.errors?.[0]?.code;
+      if (errCode === 'verification_already_verified' || errCode === 'session_exists') {
+        router.replace('/onboarding');
+        return;
+      }
       const msg = e.errors?.[0]?.longMessage || e.errors?.[0]?.message || 'Invalid code';
       showAlert('Verification Failed', msg);
     } finally {
@@ -132,9 +137,20 @@ export default function RegisterScreen() {
                 <Button variant="primary" onPress={handleVerify} loading={loading} fullWidth size="lg">
                   Verify Email
                 </Button>
-                <TouchableOpacity onPress={() => setPendingVerification(false)} style={{ marginTop: 16, alignItems: 'center' }}>
-                  <Text style={{ color: colors.textTertiary, fontSize: 13 }}>← Back</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 16 }}>
+                  <TouchableOpacity onPress={async () => {
+                    try {
+                      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+                      showAlert('Code Sent', 'A new verification code has been sent.');
+                    } catch { showAlert('Error', 'Could not resend. Try again.'); }
+                  }}>
+                    <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Resend code</Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: colors.textTertiary, fontSize: 13 }}>·</Text>
+                  <TouchableOpacity onPress={() => setPendingVerification(false)}>
+                    <Text style={{ color: colors.textTertiary, fontSize: 13 }}>← Back</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             ) : (
               <>
