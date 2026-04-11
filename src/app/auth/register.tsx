@@ -68,6 +68,19 @@ export default function RegisterScreen() {
 
           {/* ── Form card ── */}
           <View style={[styles.card, { backgroundColor: colors.card }]}>
+            {Platform.OS === 'web' && (
+              // @ts-ignore
+              <style>{`
+                input:-webkit-autofill,
+                input:-webkit-autofill:hover,
+                input:-webkit-autofill:focus {
+                  -webkit-text-fill-color: inherit !important;
+                  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+                  transition: background-color 9999s ease-in-out 0s !important;
+                  background-color: transparent !important;
+                }
+              `}</style>
+            )}
             <Input
               label="Full Name"
               value={name}

@@ -11,7 +11,7 @@ interface AuthState {
   user: User | null; token: string | null;
   isAuthenticated: boolean; isLoading: boolean; hasOnboarded: boolean;
   canvasToken: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, displayName?: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (u: Partial<User>) => void;
@@ -45,14 +45,22 @@ export const useAuthStore = create<AuthState>()(
       user: null, token: null, isAuthenticated: false,
       isLoading: false, hasOnboarded: false, canvasToken: null,
 
-      login: async (email, password) => {
+      login: async (email, password, displayName?) => {
         set({ isLoading: true });
         await new Promise(r => setTimeout(r, 800));
         if (password.length < 6) { set({ isLoading: false }); throw new Error('Password must be at least 6 characters'); }
-        set({
-          user: { id: 'u1', name: email.split('@')[0], email, school: 'Bellevue College' },
+        set(s => ({
+          user: {
+            id: s.user?.id || 'u1',
+            // prefer: provided displayName > existing stored name (if same email) > email prefix
+            name: displayName?.trim() || (s.user?.email === email ? s.user!.name : null) || email.split('@')[0],
+            email,
+            school: s.user?.school || 'Bellevue College',
+            major: s.user?.major,
+            graduationYear: s.user?.graduationYear,
+          },
           token: 'tok_' + Date.now(), isAuthenticated: true, isLoading: false,
-        });
+        }));
       },
 
       register: async (name, email, password) => {

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
 import { useAuthStore } from '../../store/auth';
 import { Input, Button } from '../../components/ui';
 import { useColors } from '../../lib/theme';
@@ -15,6 +15,7 @@ export default function LoginScreen() {
   const router   = useRouter();
   const colors   = useColors();
   const { login, isLoading } = useAuthStore();
+  const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
@@ -32,7 +33,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     if (!validate()) return;
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, name.trim() || undefined);
       router.replace('/home');
     } catch (e: any) {
       showAlert('Sign In Failed', e.message);
@@ -66,6 +67,30 @@ export default function LoginScreen() {
 
           {/* ── Form card ── */}
           <View style={[styles.card, { backgroundColor: colors.card, shadowColor: '#000' }]}>
+            {/* Fix browser autofill white-background in dark mode */}
+            {Platform.OS === 'web' && (
+              // @ts-ignore
+              <style>{`
+                input:-webkit-autofill,
+                input:-webkit-autofill:hover,
+                input:-webkit-autofill:focus {
+                  -webkit-text-fill-color: inherit !important;
+                  -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+                  transition: background-color 9999s ease-in-out 0s !important;
+                  background-color: transparent !important;
+                }
+              `}</style>
+            )}
+
+            <Input
+              label="Display Name"
+              value={name}
+              onChangeText={setName}
+              placeholder="What should we call you?"
+              autoCapitalize="words"
+              leftIcon={<User size={18} color={colors.textTertiary} />}
+            />
+            <View style={{ height: 14 }} />
             <Input
               label="Email"
               value={email}
