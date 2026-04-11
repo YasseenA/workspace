@@ -115,7 +115,7 @@ export default function GradeCalculator() {
                   value={a.grade}
                   onChangeText={v => update(i, 'grade', v)}
                 />
-                <Text style={styles.pct}>%  ×</Text>
+                <Text style={[styles.pct, { color: colors.textTertiary }]}>%  ×</Text>
                 <TextInput
                   style={[styles.numInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg },
                     Platform.OS === 'web' ? { outlineWidth: 0 } as any : {}]}
@@ -125,7 +125,7 @@ export default function GradeCalculator() {
                   value={a.weight}
                   onChangeText={v => update(i, 'weight', v)}
                 />
-                <Text style={styles.pct}>%</Text>
+                <Text style={[styles.pct, { color: colors.textTertiary }]}>%</Text>
               </View>
               <TouchableOpacity onPress={() => remove(i)} style={{ padding: 6 }}>
                 <Trash2 size={14} color={colors.error} />
@@ -190,5 +190,5 @@ const styles = StyleSheet.create({
   assignRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 6 },
   nameInput: { flex: 1, fontSize: 14, borderBottomWidth: 0.5, paddingBottom: 2 },
   numInput: { width: 54, fontSize: 14, textAlign: 'center', borderWidth: 0.5, borderRadius: 8, padding: 5 },
-  pct: { fontSize: 12, color: '#9595b0' },
+  pct: { fontSize: 12 },
 });
