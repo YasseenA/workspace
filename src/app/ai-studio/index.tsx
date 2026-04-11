@@ -26,7 +26,8 @@ const TOOLS: { id: Tool; label: string; color: string }[] = [
 function NativeInput({ value, onChange, placeholder, multiline = false, onEnter, rows = 10 }: any) {
   const base: any = {
     background: 'transparent', border: 'none', outline: 'none',
-    fontFamily: 'inherit', fontSize: 14, lineHeight: '22px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 15, lineHeight: '26px', letterSpacing: '0.01em',
     color: 'inherit', width: '100%', padding: 0, margin: 0,
   };
   if (multiline) {
@@ -180,6 +181,31 @@ export default function AIStudioScreen() {
         )}
       </View>
 
+      {/* ── Tool picker bar — full width under header ── */}
+      <View style={[styles.toolBar, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}
+        >
+          {TOOLS.map(t => (
+            <TouchableOpacity
+              key={t.id}
+              onPress={() => { setTool(t.id); clearCanvas(); }}
+              style={{
+                paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
+                borderColor:     tool === t.id ? t.color : colors.border,
+                backgroundColor: tool === t.id ? t.color : 'transparent',
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: tool === t.id ? '#fff' : colors.textSecondary }}>
+                {t.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* ── Split body ── */}
       <View
         style={{ flex: 1, flexDirection: 'row' }}
@@ -316,31 +342,6 @@ export default function AIStudioScreen() {
         {/* ─── RIGHT: Input panel ─── */}
         <View style={[styles.rightPanel, { borderLeftColor: colors.border }]}>
 
-          {/* Tool picker */}
-          <View style={[styles.toolBar, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingHorizontal: 14, paddingVertical: 10 }}
-            >
-              {TOOLS.map(t => (
-                <TouchableOpacity
-                  key={t.id}
-                  onPress={() => { setTool(t.id); clearCanvas(); }}
-                  style={{
-                    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5,
-                    borderColor:     tool === t.id ? t.color : colors.border,
-                    backgroundColor: tool === t.id ? t.color : 'transparent',
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: tool === t.id ? '#fff' : colors.textSecondary }}>
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
           {/* Scrollable content — generate button always reachable */}
           <ScrollView
             contentContainerStyle={styles.rightContent}
@@ -351,13 +352,24 @@ export default function AIStudioScreen() {
 
             <View style={[styles.textareaBox, { backgroundColor: colors.bg, borderColor: colors.border }]}>
               {isWeb ? (
-                <NativeInput
-                  value={content}
-                  onChange={setContent}
-                  placeholder={'Paste notes or study material here…\n\nDrag & drop a .txt file anywhere.'}
-                  multiline
-                  rows={12}
-                />
+                <>
+                  <style>{`
+                    .ai-textarea::placeholder { color: #6b7280; font-size: 14px; line-height: 1.7; }
+                  `}</style>
+                  <textarea
+                    className="ai-textarea"
+                    value={content}
+                    onChange={(e: any) => setContent(e.target.value)}
+                    placeholder={"Paste notes or study material here…\n\nYou can also drag & drop a .txt file anywhere on the screen."}
+                    rows={12}
+                    style={{
+                      background: 'transparent', border: 'none', outline: 'none', resize: 'none',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                      fontSize: 15, lineHeight: '26px', letterSpacing: '0.01em',
+                      color: 'inherit', width: '100%', padding: 0, margin: 0, height: '100%',
+                    }}
+                  />
+                </>
               ) : null}
             </View>
 
