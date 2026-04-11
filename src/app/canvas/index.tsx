@@ -65,14 +65,14 @@ export default function CanvasScreen() {
         {/* Header */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <View>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>Canvas LMS</Text>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text, letterSpacing: -0.5 }}>Canvas</Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
               {connected ? `${courses.length} courses · ${assignments.length} assignments` : 'Not connected'}
             </Text>
           </View>
           {connected && (
             <TouchableOpacity onPress={handleSync} disabled={isSyncing}
-              style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
+              style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' }}>
               {isSyncing
                 ? <ActivityIndicator size="small" color={colors.primary} />
                 : <RefreshCw size={18} color={colors.primary} />}
@@ -307,31 +307,31 @@ export default function CanvasScreen() {
 }
 
 const styles = StyleSheet.create({
-  connectCard:   { borderRadius: 16, borderWidth: 0.5, padding: 24, paddingVertical: 28 },
-  connectIcon:   { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 16, alignSelf: 'center' },
-  connectTitle:  { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  connectDesc:   { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  steps:         { borderRadius: 12, borderWidth: 0.5, padding: 16, marginBottom: 16, gap: 10 },
-  stepsTitle:    { fontSize: 13, fontWeight: '700', marginBottom: 6 },
-  step:          { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepNum:       { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  connectCard:   { borderRadius: 24, borderWidth: 0.5, padding: 24, paddingVertical: 32 },
+  connectIcon:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 18, alignSelf: 'center' },
+  connectTitle:  { fontSize: 21, fontWeight: '800', textAlign: 'center', marginBottom: 8, letterSpacing: -0.3 },
+  connectDesc:   { fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 20 },
+  steps:         { borderRadius: 16, borderWidth: 0.5, padding: 16, marginBottom: 16, gap: 12 },
+  stepsTitle:    { fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  step:          { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepNum:       { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   stepNumText:   { color: '#fff', fontSize: 12, fontWeight: '700' },
   stepText:      { fontSize: 13, flex: 1 },
   canvasLink:    { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center' },
   canvasLinkText:{ fontSize: 14, fontWeight: '600' },
-  statusBar:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 0.5, padding: 14, marginBottom: 12 },
-  errorBar:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 0.5, padding: 12, marginBottom: 12 },
-  statCard:      { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 0.5 },
+  statusBar:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, borderWidth: 0.5, padding: 14, marginBottom: 12 },
+  errorBar:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 0.5, padding: 12, marginBottom: 12 },
+  statCard:      { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 16, borderWidth: 0.5 },
   statNum:       { fontSize: 22, fontWeight: '800' },
   statLabel:     { fontSize: 10, marginTop: 2 },
-  tabs:          { flexDirection: 'row', padding: 4, borderRadius: 12, borderWidth: 0.5, marginBottom: 12 },
-  tab:           { flex: 1, alignItems: 'center', paddingVertical: 8 },
-  assignCard:    { borderRadius: 12, borderWidth: 0.5, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
-  courseCard:    { borderRadius: 14, borderWidth: 0.5, padding: 14, marginBottom: 8 },
-  courseIcon:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  courseAssign:  { flexDirection: 'row', alignItems: 'center', paddingTop: 8, paddingHorizontal: 2, borderTopWidth: 0.5, gap: 8, marginTop: 2 },
-  emptyCard:     { borderRadius: 12, borderWidth: 0.5, padding: 20 },
+  tabs:          { flexDirection: 'row', padding: 4, borderRadius: 16, borderWidth: 0.5, marginBottom: 12 },
+  tab:           { flex: 1, alignItems: 'center', paddingVertical: 9 },
+  assignCard:    { borderRadius: 16, borderWidth: 0.5, padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  courseCard:    { borderRadius: 18, borderWidth: 0.5, padding: 16, marginBottom: 10 },
+  courseIcon:    { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  courseAssign:  { flexDirection: 'row', alignItems: 'center', paddingTop: 9, paddingHorizontal: 2, borderTopWidth: 0.5, gap: 8, marginTop: 4 },
+  emptyCard:     { borderRadius: 16, borderWidth: 0.5, padding: 24 },
   overlay:       { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modal:         { borderRadius: 20, padding: 24, width: '100%', maxWidth: 480 },
-  tokenInput:    { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 13, minHeight: 80, fontFamily: 'monospace' },
+  modal:         { borderRadius: 24, padding: 24, width: '100%', maxWidth: 480 },
+  tokenInput:    { borderWidth: 1, borderRadius: 12, padding: 13, fontSize: 13, minHeight: 80, fontFamily: 'monospace' },
 });

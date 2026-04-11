@@ -16,9 +16,9 @@ type Tool = 'summarize' | 'explain' | 'flashcards' | 'quiz' | 'studyGuide' | 'wr
 type Msg  = { role: 'user' | 'assistant'; text: string };
 
 const TOOLS: { id: Tool; label: string; color: string }[] = [
-  { id: 'summarize',  label: 'Summarize',   color: '#6366f1' },
+  { id: 'summarize',  label: 'Summarize',   color: '#7c3aed' },
   { id: 'explain',    label: 'Explain',     color: '#10b981' },
-  { id: 'flashcards', label: 'Flashcards',  color: '#8b5cf6' },
+  { id: 'flashcards', label: 'Flashcards',  color: '#f97316' },
   { id: 'quiz',       label: 'Quiz',        color: '#f59e0b' },
   { id: 'studyGuide', label: 'Study Guide', color: '#3b82f6' },
   { id: 'writing',    label: 'Writing',     color: '#ec4899' },
