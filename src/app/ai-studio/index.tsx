@@ -140,31 +140,35 @@ export default function AIStudioScreen() {
   const generateWith = async (src: string) => {
     const hasImage = !!pastedImage;
     if (!src.trim() && !hasImage) return;
-    const next: Msg[] = [...msgs, { role: 'user', text: `Generate ${cur.label}${hasImage ? ' (image)' : ''}`, color: cur.color, isAction: true }];
+    // User bubble shows the actual input (truncated) or image indicator
+    const userPreview = hasImage
+      ? `📷 Image${src.trim() ? ' + "' + src.slice(0, 60) + (src.length > 60 ? '…' : '') + '"' : ''}`
+      : src.length > 100 ? src.slice(0, 100) + '…' : src;
+    const next: Msg[] = [...msgs, { role: 'user', text: userPreview, color: cur.color }];
     setMsgs(next); setLoading(true); clearCanvas(); scroll();
     try {
       let reply = '';
       if (hasImage) {
         const { base64, mime } = pastedImage!;
-        if (tool === 'summarize')  { reply = await claude.summarizeImage(base64, mime, summaryLen);         setCanvasText(reply); }
-        if (tool === 'explain')    { reply = await claude.explainImage(base64, mime, explainLvl);            setCanvasText(reply); }
-        if (tool === 'flashcards') { const c = await claude.flashcardsFromImage(base64, mime, cardCount);   setFlashcards(c); reply = `${c.length} flashcards ready.`; }
-        if (tool === 'quiz')       { const q = await claude.quizFromImage(base64, mime, quizCount);         setQuiz(q);       reply = `${q.length} questions ready.`; }
-        if (tool === 'studyGuide') { reply = await claude.studyGuideFromImage(base64, mime);                setCanvasText(reply); }
-        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle);                  setCanvasText(reply); }
-        if (tool === 'aiCheck')    { reply = 'AI detection requires text input — please paste the text.'; }
+        if (tool === 'summarize')  { reply = await claude.summarizeImage(base64, mime, summaryLen); }
+        if (tool === 'explain')    { reply = await claude.explainImage(base64, mime, explainLvl); }
+        if (tool === 'flashcards') { const c = await claude.flashcardsFromImage(base64, mime, cardCount); setFlashcards(c); reply = `Generated ${c.length} flashcards from your image.`; }
+        if (tool === 'quiz')       { const q = await claude.quizFromImage(base64, mime, quizCount);       setQuiz(q);       reply = `Generated ${q.length} quiz questions from your image.`; }
+        if (tool === 'studyGuide') { reply = await claude.studyGuideFromImage(base64, mime); }
+        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle); }
+        if (tool === 'aiCheck')    { reply = 'AI detection requires text — please paste the text content directly.'; }
       } else {
-        if (tool === 'summarize')  { reply = await claude.summarize(src, summaryLen);           setCanvasText(reply); }
-        if (tool === 'explain')    { reply = await claude.explainSimply(src, explainLvl);        setCanvasText(reply); }
-        if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount);  setFlashcards(c); reply = `${c.length} flashcards ready.`; }
-        if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);        setQuiz(q);       reply = `${q.length} questions ready.`; }
-        if (tool === 'studyGuide') { reply = await claude.generateStudyGuide(src);               setCanvasText(reply); }
-        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle);       setCanvasText(reply); }
-        if (tool === 'aiCheck')    { const r = await gptzero.check(src);                         setAiResult(r);   reply = `${Math.round(r.score * 100)}% AI — ${r.label}`; }
+        if (tool === 'summarize')  { reply = await claude.summarize(src, summaryLen); }
+        if (tool === 'explain')    { reply = await claude.explainSimply(src, explainLvl); }
+        if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount); setFlashcards(c); reply = `Generated ${c.length} flashcards — tap any card to flip it.`; }
+        if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);       setQuiz(q);       reply = `Generated ${q.length} quiz questions — pick your answers below.`; }
+        if (tool === 'studyGuide') { reply = await claude.generateStudyGuide(src); }
+        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle); }
+        if (tool === 'aiCheck')    { const r = await gptzero.check(src); setAiResult(r); reply = `AI Detection: ${Math.round(r.score * 100)}% AI probability — ${r.label}`; }
       }
-      setMsgs([...next, { role: 'assistant', text: reply }]);
+      setMsgs([...next, { role: 'assistant', text: reply, color: cur.color }]);
     } catch (e: any) {
-      setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e) }]);
+      setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e), color: cur.color }]);
     } finally { setLoading(false); scroll(); }
   };
 
@@ -304,23 +308,18 @@ export default function AIStudioScreen() {
                       : [styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }],
                   ]}
                 >
-                  {m.role === 'assistant' && <Text style={[styles.bubbleLbl, { color: msgColor }]}>Claude</Text>}
+                  {m.role === 'assistant' && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                      <Text style={[styles.bubbleLbl, { color: msgColor }]}>Claude</Text>
+                      <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(m.text); }}>
+                        <Copy size={12} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                   <Text style={[styles.bubbleTxt, { color: m.role === 'user' ? '#fff' : colors.text }]}>{m.text}</Text>
                 </View>
               );
             })}
-
-            {canvasText !== '' && (
-              <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={[styles.bubbleLbl, { color: cur.color }]}>{cur.label}</Text>
-                  <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(canvasText); }}>
-                    <Copy size={12} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={{ color: colors.text, fontSize: 13, lineHeight: 20 }}>{canvasText}</Text>
-              </View>
-            )}
 
             {flashcards.map((card, i) => (
               <TouchableOpacity
