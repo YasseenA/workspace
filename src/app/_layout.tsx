@@ -3,8 +3,10 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { AuthProvider } from '../store/auth';
+import { ClerkProvider } from '@clerk/clerk-expo';
 import { useSettingsStore } from '../store/settings';
+
+const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
 function ThemedStatusBar() {
   const darkMode = useSettingsStore(s => s.darkMode);
@@ -13,13 +15,13 @@ function ThemedStatusBar() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
+    <ClerkProvider publishableKey={CLERK_KEY}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
           <Stack screenOptions={{ headerShown: false }} />
           <ThemedStatusBar />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ClerkProvider>
   );
 }

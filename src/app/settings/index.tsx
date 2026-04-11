@@ -7,6 +7,7 @@ import {
   ChevronRight, Bot, Link2, Timer, BookOpen,
   Star, ExternalLink, TrendingUp, CheckSquare,
 } from 'lucide-react-native';
+import { useUser, useClerk } from '@clerk/clerk-expo';
 import { useAuthStore }    from '../../store/auth';
 import { useCanvasStore }  from '../../store/canvas';
 import { useNotesStore }   from '../../store/notes';
@@ -20,7 +21,9 @@ import { initials, showAlert } from '../../utils/helpers';
 export default function SettingsScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { user, logout }                     = useAuthStore();
+  const { user }                             = useUser();
+  const { signOut }                          = useClerk();
+  const { resetAppState }                    = useAuthStore();
   const { connected: canvasConnected, courses } = useCanvasStore();
   const { notes }                            = useNotesStore();
   const { tasks }                            = useTasksStore();
@@ -34,7 +37,7 @@ export default function SettingsScreen() {
   const handleLogout = () => {
     showAlert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: () => { logout(); router.replace('/auth/login'); } },
+      { text: 'Sign Out', style: 'destructive', onPress: async () => { resetAppState(); await signOut(); router.replace('/auth/login'); } },
     ]);
   };
 
@@ -87,12 +90,12 @@ export default function SettingsScreen() {
         <View style={{ paddingHorizontal: 16, marginTop: -32 }}>
           <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.avatarText}>{initials(user?.name || 'Student')}</Text>
+              <Text style={styles.avatarText}>{initials(user?.fullName || user?.firstName || 'S')}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.profileName, { color: colors.text }]}>{user?.name || 'Student'}</Text>
+              <Text style={[styles.profileName, { color: colors.text }]}>{user?.fullName || user?.firstName || 'Student'}</Text>
               <Text style={[styles.profileEmail, { color: colors.textSecondary }]} numberOfLines={1}>
-                {user?.email || 'student@school.edu'}
+                {user?.primaryEmailAddress?.emailAddress || 'student@school.edu'}
               </Text>
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 <View style={[styles.badge, { backgroundColor: colors.primaryLight }]}>
@@ -100,7 +103,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={[styles.badge, { backgroundColor: colors.bg }]}>
                   <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary }}>
-                    {user?.school || 'Bellevue College'}
+                    Bellevue College
                   </Text>
                 </View>
                 {canvasConnected && (

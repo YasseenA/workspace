@@ -10,7 +10,7 @@ import {
   Plus, ChevronRight, Clock, BookOpen,
   Calendar, ArrowRight,
 } from 'lucide-react-native';
-import { useAuthStore }  from '../../store/auth';
+import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
 import { useTasksStore } from '../../store/tasks';
 import { useFocusStore } from '../../store/focus';
@@ -22,7 +22,7 @@ import { fmt, priorityColor, initials } from '../../utils/helpers';
 export default function HomeScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { user } = useAuthStore();
+  const { user } = useUser();
   const { notes } = useNotesStore();
   const { tasks } = useTasksStore();
   const { totalFocusMinutes } = useFocusStore();
@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const now      = new Date();
   const hour     = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const firstName = user?.name?.split(' ')[0] || 'Student';
+  const firstName = user?.firstName || user?.fullName?.split(' ')[0] || 'Student';
 
   const dateLabel = now.toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric',
@@ -104,7 +104,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/settings')}
               style={styles.heroAvatar}
             >
-              <Text style={styles.heroAvatarText}>{initials(user?.name || 'S')}</Text>
+              <Text style={styles.heroAvatarText}>{initials(user?.fullName || user?.firstName || 'S')}</Text>
             </TouchableOpacity>
           </View>
 

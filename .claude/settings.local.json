@@ -4,7 +4,8 @@
       "Bash(npx expo:*)",
       "Bash(node -e ':*)",
       "Bash(git:*)",
-      "Bash(node canvas-proxy.js)"
+      "Bash(node canvas-proxy.js)",
+      "Bash(npm ls:*)"
     ]
   }
 }

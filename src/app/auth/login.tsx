@@ -5,45 +5,56 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
-import { useAuthStore } from '../../store/auth';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { useSignIn } from '@clerk/clerk-expo';
 import { Input, Button } from '../../components/ui';
 import { useColors } from '../../lib/theme';
 import { showAlert } from '../../utils/helpers';
 
 export default function LoginScreen() {
-  const router   = useRouter();
-  const colors   = useColors();
-  const { login, isLoading } = useAuthStore();
-  const [name,     setName]     = useState('');
+  const router  = useRouter();
+  const colors  = useColors();
+  const { signIn, setActive, isLoaded } = useSignIn();
+
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
+  const [loading,  setLoading]  = useState(false);
   const [errors,   setErrors]   = useState<any>({});
 
   const validate = () => {
     const e: any = {};
-    if (!email.trim())                       e.email    = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email))   e.email    = 'Enter a valid email';
-    if (!password)                           e.password = 'Password is required';
+    if (!email.trim())                     e.email    = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) e.email    = 'Enter a valid email';
+    if (!password)                         e.password = 'Password is required';
     setErrors(e);
     return !Object.keys(e).length;
   };
 
   const handleLogin = async () => {
-    if (!validate()) return;
+    if (!isLoaded || !validate()) return;
+    setLoading(true);
     try {
-      await login(email.trim(), password, name.trim() || undefined);
-      router.replace('/home');
+      const result = await signIn.create({
+        identifier: email.trim(),
+        password,
+      });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        router.replace('/home');
+      }
     } catch (e: any) {
-      showAlert('Sign In Failed', e.message);
+      const msg = e.errors?.[0]?.longMessage || e.errors?.[0]?.message || e.message || 'Sign in failed';
+      showAlert('Sign In Failed', msg);
+    } finally {
+      setLoading(false);
     }
   };
 
   const gradientStyle: any =
     Platform.OS === 'web'
       ? { background: 'linear-gradient(145deg, #7c3aed 0%, #4338ca 60%, #312e81 100%)' }
-      : { backgroundColor: colors.primary };
+      : { backgroundColor: '#7c3aed' };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -57,7 +68,6 @@ export default function LoginScreen() {
           <View style={[styles.hero, gradientStyle]}>
             <View style={styles.heroOrb1} />
             <View style={styles.heroOrb2} />
-
             <View style={styles.logoWrap}>
               <Text style={styles.logoLetter}>W</Text>
             </View>
@@ -67,7 +77,6 @@ export default function LoginScreen() {
 
           {/* ── Form card ── */}
           <View style={[styles.card, { backgroundColor: colors.card, shadowColor: '#000' }]}>
-            {/* Fix browser autofill white-background in dark mode */}
             {Platform.OS === 'web' && (
               // @ts-ignore
               <style>{`
@@ -77,20 +86,10 @@ export default function LoginScreen() {
                   -webkit-text-fill-color: inherit !important;
                   -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
                   transition: background-color 9999s ease-in-out 0s !important;
-                  background-color: transparent !important;
                 }
               `}</style>
             )}
 
-            <Input
-              label="Display Name"
-              value={name}
-              onChangeText={setName}
-              placeholder="What should we call you?"
-              autoCapitalize="words"
-              leftIcon={<User size={18} color={colors.textTertiary} />}
-            />
-            <View style={{ height: 14 }} />
             <Input
               label="Email"
               value={email}
@@ -118,7 +117,7 @@ export default function LoginScreen() {
               onRightIconPress={() => setShowPw(!showPw)}
             />
             <View style={{ height: 24 }} />
-            <Button variant="primary" onPress={handleLogin} loading={isLoading} fullWidth size="lg">
+            <Button variant="primary" onPress={handleLogin} loading={loading} fullWidth size="lg">
               Sign In
             </Button>
 
@@ -137,12 +136,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 52,
-    paddingTop: 60,
-    overflow: 'hidden',
-    position: 'relative',
+    alignItems: 'center', justifyContent: 'flex-end',
+    paddingBottom: 52, paddingTop: 60,
+    overflow: 'hidden', position: 'relative',
   },
   heroOrb1: {
     position: 'absolute', width: 260, height: 260, borderRadius: 130,
@@ -155,31 +151,18 @@ const styles = StyleSheet.create({
   logoWrap: {
     width: 72, height: 72, borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 20,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
   },
   logoLetter: { fontSize: 34, fontWeight: '800', color: '#fff' },
   heroTitle:  { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 6 },
   heroSub:    { fontSize: 15, color: 'rgba(255,255,255,0.75)' },
-
   card: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -24,
-    padding: 28,
-    paddingTop: 32,
-    flex: 1,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 8,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    marginTop: -24, padding: 28, paddingTop: 32, flex: 1,
+    shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 8,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
+  footer:     { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText: { fontSize: 14 },
   link:       { fontSize: 14, fontWeight: '700' },
 });
