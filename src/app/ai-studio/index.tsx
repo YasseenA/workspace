@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Copy, Send, RotateCcw, Upload } from 'lucide-react-native';
@@ -10,7 +10,7 @@ import { claude } from '../../lib/claude';
 import { gptzero } from '../../lib/gptzero';
 
 type Tool = 'summarize' | 'explain' | 'flashcards' | 'quiz' | 'studyGuide' | 'writing' | 'aiCheck';
-type Msg  = { role: 'user' | 'assistant'; text: string };
+type Msg  = { role: 'user' | 'assistant'; text: string; color?: string; isAction?: boolean };
 
 const TOOLS: { id: Tool; label: string; color: string }[] = [
   { id: 'summarize',  label: 'Summarize',   color: '#7c3aed' },
@@ -100,6 +100,25 @@ export default function AIStudioScreen() {
     reader.readAsDataURL(file);
   };
 
+  // Global paste: catches Ctrl+V anywhere on page, not just when textarea is focused
+  useEffect(() => {
+    if (!isWeb) return;
+    const handler = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (file) handleImagePaste(file);
+          return;
+        }
+      }
+    };
+    (window as any).addEventListener('paste', handler);
+    return () => (window as any).removeEventListener('paste', handler);
+  }, [isWeb]);
+
   const onTextareaPaste = (e: any) => {
     const items: DataTransferItemList = e.clipboardData?.items;
     if (!items) return;
@@ -121,7 +140,7 @@ export default function AIStudioScreen() {
   const generateWith = async (src: string) => {
     const hasImage = !!pastedImage;
     if (!src.trim() && !hasImage) return;
-    const next: Msg[] = [...msgs, { role: 'user', text: `Generate ${cur.label}${hasImage ? ' (image)' : ''}` }];
+    const next: Msg[] = [...msgs, { role: 'user', text: `Generate ${cur.label}${hasImage ? ' (image)' : ''}`, color: cur.color, isAction: true }];
     setMsgs(next); setLoading(true); clearCanvas(); scroll();
     try {
       let reply = '';
@@ -155,7 +174,7 @@ export default function AIStudioScreen() {
     if (!chatInput.trim() || loading) return;
     const q   = chatInput.trim();
     const ctx = content ? `Context:\n${content}\n\n` : canvasText ? `Context:\n${canvasText}\n\n` : '';
-    const next: Msg[] = [...msgs, { role: 'user', text: q }];
+    const next: Msg[] = [...msgs, { role: 'user', text: q, color: cur.color }];
     setMsgs(next); setChatInput(''); setLoading(true); scroll();
     try {
       const r = await claude.explainSimply(`${ctx}${q}`, 'intermediate');
@@ -273,20 +292,23 @@ export default function AIStudioScreen() {
               </View>
             )}
 
-            {msgs.map((m, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.bubble,
-                  m.role === 'user'
-                    ? { backgroundColor: cur.color, alignSelf: 'flex-end' as any, maxWidth: '80%' }
-                    : [styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }],
-                ]}
-              >
-                {m.role === 'assistant' && <Text style={[styles.bubbleLbl, { color: cur.color }]}>Claude</Text>}
-                <Text style={[styles.bubbleTxt, { color: m.role === 'user' ? '#fff' : colors.text }]}>{m.text}</Text>
-              </View>
-            ))}
+            {msgs.filter(m => !m.isAction).map((m, i) => {
+              const msgColor = m.color || cur.color;
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.bubble,
+                    m.role === 'user'
+                      ? { backgroundColor: msgColor, alignSelf: 'flex-end' as any, maxWidth: '80%' }
+                      : [styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }],
+                  ]}
+                >
+                  {m.role === 'assistant' && <Text style={[styles.bubbleLbl, { color: msgColor }]}>Claude</Text>}
+                  <Text style={[styles.bubbleTxt, { color: m.role === 'user' ? '#fff' : colors.text }]}>{m.text}</Text>
+                </View>
+              );
+            })}
 
             {canvasText !== '' && (
               <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
