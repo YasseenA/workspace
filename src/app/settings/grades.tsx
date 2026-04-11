@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Trash2, TrendingUp } from 'lucide-react-native';
 import { Card, Button } from '../../components/ui';
-import { useColors, colors } from '../../lib/theme';
+import { useColors } from '../../lib/theme';
 
 interface Assignment { name: string; grade: string; weight: string; }
 
@@ -185,10 +185,10 @@ export default function GradeCalculator() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 0.5 },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 0.5 },
-  resultCard: { alignItems: 'center', paddingVertical: 28, marginBottom: 16 },
+  backBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 0.5 },
+  resultCard: { alignItems: 'center', paddingVertical: 32, marginBottom: 16 },
   assignRow: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 6 },
   nameInput: { flex: 1, fontSize: 14, borderBottomWidth: 0.5, paddingBottom: 2 },
-  numInput: { width: 52, fontSize: 14, textAlign: 'center', borderWidth: 0.5, borderRadius: 6, padding: 4 },
-  pct: { fontSize: 12, color: colors.textTertiary },
+  numInput: { width: 54, fontSize: 14, textAlign: 'center', borderWidth: 0.5, borderRadius: 8, padding: 5 },
+  pct: { fontSize: 12, color: '#9595b0' },
 });

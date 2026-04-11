@@ -32,7 +32,7 @@ export default function NoteEditorScreen() {
   // Drawing state (web only)
   const canvasRef = useRef<any>(null);
   const isDrawingRef = useRef(false);
-  const [drawColor, setDrawColor] = useState('#6366f1');
+  const [drawColor, setDrawColor] = useState('#7c3aed');
   const [brushSize, setBrushSize] = useState(3);
   const [isEraser, setIsEraser] = useState(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
@@ -130,7 +130,7 @@ export default function NoteEditorScreen() {
 
   const wc = wordCount(content);
 
-  const DRAW_COLORS = ['#6366f1','#ef4444','#10b981','#f59e0b','#3b82f6','#ec4899','#0f172a','#fff'];
+  const DRAW_COLORS = ['#7c3aed','#ef4444','#10b981','#f97316','#3b82f6','#ec4899','#0a0a12','#ffffff'];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.card }}>
@@ -283,20 +283,20 @@ export default function NoteEditorScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderBottomWidth: 0.5, gap: 8, flexWrap: 'wrap' },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 0.5 },
-  modeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 0.5 },
-  aiBar: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 0.5 },
+  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 0.5 },
+  modeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 0.5 },
+  aiBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: 0.5 },
   aiBarLabel: { fontSize: 12, fontWeight: '700' },
-  aiChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: 'transparent', borderWidth: 0.5 },
-  aiChipText: { fontSize: 12, fontWeight: '500' },
-  aiOutput: { borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 0.5 },
-  titleInput: { fontSize: 24, fontWeight: '800', marginBottom: 12, padding: 0, borderWidth: 0 },
+  aiChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: 'transparent', borderWidth: 0.5 },
+  aiChipText: { fontSize: 12, fontWeight: '600' },
+  aiOutput: { borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 0.5 },
+  titleInput: { fontSize: 26, fontWeight: '800', marginBottom: 12, padding: 0, borderWidth: 0, letterSpacing: -0.5 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12, alignItems: 'center' },
   tagInput: { fontSize: 13, minWidth: 80, borderWidth: 0 },
   divider: { height: 0.5, marginBottom: 16 },
-  contentInput: { fontSize: 16, lineHeight: 26, minHeight: 300, borderWidth: 0 },
+  contentInput: { fontSize: 16, lineHeight: 27, minHeight: 300, borderWidth: 0 },
   drawBar: { paddingVertical: 10, borderBottomWidth: 0.5 },
-  sizeBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  toolBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sizeBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  toolBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   insertBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginLeft: 8 },
 });
