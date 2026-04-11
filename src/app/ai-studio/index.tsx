@@ -23,12 +23,12 @@ const TOOLS: { id: Tool; label: string; color: string }[] = [
 ];
 
 /* Native HTML inputs — avoids GestureHandler swallowing keystrokes on web */
-function NativeInput({ value, onChange, placeholder, multiline = false, onEnter, rows = 10 }: any) {
+function NativeInput({ value, onChange, placeholder, multiline = false, onEnter, rows = 10, color = 'inherit' }: any) {
   const base: any = {
     background: 'transparent', border: 'none', outline: 'none',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     fontSize: 15, lineHeight: '26px', letterSpacing: '0.01em',
-    color: 'inherit', width: '100%', padding: 0, margin: 0,
+    color, width: '100%', padding: 0, margin: 0,
   };
   if (multiline) {
     return (
@@ -326,6 +326,7 @@ export default function AIStudioScreen() {
                   onChange={setChatInput}
                   onEnter={sendChat}
                   placeholder="Ask Claude a follow-up…"
+                  color={colors.text}
                 />
               )}
             </View>
@@ -366,7 +367,7 @@ export default function AIStudioScreen() {
                       background: 'transparent', border: 'none', outline: 'none', resize: 'none',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                       fontSize: 15, lineHeight: '26px', letterSpacing: '0.01em',
-                      color: 'inherit', width: '100%', padding: 0, margin: 0, height: '100%',
+                      color: colors.text, width: '100%', padding: 0, margin: 0, height: '100%',
                     }}
                   />
                 </>
