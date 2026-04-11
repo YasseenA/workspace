@@ -76,6 +76,7 @@ export default function AIStudioScreen() {
   const [cardCount,   setCardCount]   = useState(5);
   const [quizCount,   setQuizCount]   = useState(5);
   const [writeStyle,  setWriteStyle]  = useState<'clarity' | 'formal' | 'concise' | 'humanize'>('clarity');
+  const [pastedImage, setPastedImage] = useState<{ base64: string; mime: string; preview: string } | null>(null);
 
   const chatRef   = useRef<ScrollView>(null);
   const dragCount = useRef(0);
@@ -87,31 +88,68 @@ export default function AIStudioScreen() {
     setFlipped(new Set()); setSelAns({}); setShownAns({});
   };
 
+  const handleImagePaste = (file: File) => {
+    const mime = file.type as string;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      // strip the "data:image/...;base64," prefix to get raw base64
+      const base64 = dataUrl.split(',')[1];
+      setPastedImage({ base64, mime, preview: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onTextareaPaste = (e: any) => {
+    const items: DataTransferItemList = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) handleImagePaste(file);
+        return;
+      }
+    }
+  };
+
   const errMsg = (e: any) =>
     e.message?.includes('fetch')
       ? 'Proxy unreachable. Run: node canvas-proxy.js'
       : e.message || 'Something went wrong.';
 
   const generateWith = async (src: string) => {
-    if (!src.trim()) return;
-    const next: Msg[] = [...msgs, { role: 'user', text: `Generate ${cur.label}` }];
+    const hasImage = !!pastedImage;
+    if (!src.trim() && !hasImage) return;
+    const next: Msg[] = [...msgs, { role: 'user', text: `Generate ${cur.label}${hasImage ? ' (image)' : ''}` }];
     setMsgs(next); setLoading(true); clearCanvas(); scroll();
     try {
       let reply = '';
-      if (tool === 'summarize')  { reply = await claude.summarize(src, summaryLen);           setCanvasText(reply); }
-      if (tool === 'explain')    { reply = await claude.explainSimply(src, explainLvl);        setCanvasText(reply); }
-      if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount);  setFlashcards(c); reply = `${c.length} flashcards ready.`; }
-      if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);        setQuiz(q);       reply = `${q.length} questions ready.`; }
-      if (tool === 'studyGuide') { reply = await claude.generateStudyGuide(src);               setCanvasText(reply); }
-      if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle);       setCanvasText(reply); }
-      if (tool === 'aiCheck')    { const r = await gptzero.check(src);                         setAiResult(r);   reply = `${Math.round(r.score * 100)}% AI — ${r.label}`; }
+      if (hasImage) {
+        const { base64, mime } = pastedImage!;
+        if (tool === 'summarize')  { reply = await claude.summarizeImage(base64, mime, summaryLen);         setCanvasText(reply); }
+        if (tool === 'explain')    { reply = await claude.explainImage(base64, mime, explainLvl);            setCanvasText(reply); }
+        if (tool === 'flashcards') { const c = await claude.flashcardsFromImage(base64, mime, cardCount);   setFlashcards(c); reply = `${c.length} flashcards ready.`; }
+        if (tool === 'quiz')       { const q = await claude.quizFromImage(base64, mime, quizCount);         setQuiz(q);       reply = `${q.length} questions ready.`; }
+        if (tool === 'studyGuide') { reply = await claude.studyGuideFromImage(base64, mime);                setCanvasText(reply); }
+        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle);                  setCanvasText(reply); }
+        if (tool === 'aiCheck')    { reply = 'AI detection requires text input — please paste the text.'; }
+      } else {
+        if (tool === 'summarize')  { reply = await claude.summarize(src, summaryLen);           setCanvasText(reply); }
+        if (tool === 'explain')    { reply = await claude.explainSimply(src, explainLvl);        setCanvasText(reply); }
+        if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount);  setFlashcards(c); reply = `${c.length} flashcards ready.`; }
+        if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);        setQuiz(q);       reply = `${q.length} questions ready.`; }
+        if (tool === 'studyGuide') { reply = await claude.generateStudyGuide(src);               setCanvasText(reply); }
+        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle);       setCanvasText(reply); }
+        if (tool === 'aiCheck')    { const r = await gptzero.check(src);                         setAiResult(r);   reply = `${Math.round(r.score * 100)}% AI — ${r.label}`; }
+      }
       setMsgs([...next, { role: 'assistant', text: reply }]);
     } catch (e: any) {
       setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e) }]);
     } finally { setLoading(false); scroll(); }
   };
 
-  const generate  = () => generateWith(content);
+  const generate = () => generateWith(content);
 
   const sendChat = async () => {
     if (!chatInput.trim() || loading) return;
@@ -134,6 +172,10 @@ export default function AIStudioScreen() {
     e.preventDefault(); dragCount.current = 0; setIsDragging(false);
     const file = e.dataTransfer?.files?.[0];
     if (!file) return;
+    if (file.type.startsWith('image/')) {
+      handleImagePaste(file);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const text = (ev.target?.result as string) || '';
@@ -357,17 +399,37 @@ export default function AIStudioScreen() {
                   <style>{`
                     .ai-textarea::placeholder { color: #6b7280; font-size: 14px; line-height: 1.7; }
                   `}</style>
+                  {/* Image preview */}
+                  {pastedImage && (
+                    <div style={{ position: 'relative', marginBottom: 10, display: 'inline-block' }}>
+                      <img
+                        src={pastedImage.preview}
+                        alt="pasted"
+                        style={{ maxHeight: 160, maxWidth: '100%', borderRadius: 10, display: 'block', objectFit: 'contain' }}
+                      />
+                      <button
+                        onClick={() => setPastedImage(null)}
+                        style={{
+                          position: 'absolute', top: 4, right: 4,
+                          background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%',
+                          width: 22, height: 22, cursor: 'pointer', color: '#fff',
+                          fontSize: 13, lineHeight: '22px', textAlign: 'center', padding: 0,
+                        }}
+                      >✕</button>
+                    </div>
+                  )}
                   <textarea
                     className="ai-textarea"
                     value={content}
                     onChange={(e: any) => setContent(e.target.value)}
-                    placeholder={"Paste notes or study material here…\n\nYou can also drag & drop a .txt file anywhere on the screen."}
-                    rows={12}
+                    onPaste={onTextareaPaste}
+                    placeholder={pastedImage ? 'Add optional context text…' : 'Paste notes, text, or an image here…\n\nYou can also drag & drop a .txt file.'}
+                    rows={pastedImage ? 4 : 12}
                     style={{
                       background: 'transparent', border: 'none', outline: 'none', resize: 'none',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                       fontSize: 15, lineHeight: '26px', letterSpacing: '0.01em',
-                      color: colors.text, width: '100%', padding: 0, margin: 0, height: '100%',
+                      color: colors.text, width: '100%', padding: 0, margin: 0,
                     }}
                   />
                 </>
@@ -401,8 +463,8 @@ export default function AIStudioScreen() {
             {/* Generate button — always visible because parent is ScrollView */}
             <TouchableOpacity
               onPress={generate}
-              disabled={loading || !content.trim()}
-              style={[styles.genBtn, { backgroundColor: content.trim() ? cur.color : colors.border }]}
+              disabled={loading || (!content.trim() && !pastedImage)}
+              style={[styles.genBtn, { backgroundColor: (content.trim() || pastedImage) ? cur.color : colors.border }]}
               activeOpacity={0.85}
             >
               {loading
