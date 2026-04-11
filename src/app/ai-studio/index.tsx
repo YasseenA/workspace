@@ -319,7 +319,7 @@ export default function AIStudioScreen() {
         </View>
 
         {/* ─── RIGHT: Input Panel ─── */}
-        <View style={{ width: 360, display: 'flex', flexDirection: 'column' }}>
+        <View style={{ width: 360, flexDirection: 'column', alignSelf: 'stretch' }}>
           {/* Tool picker */}
           <View style={[styles.toolBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -337,56 +337,54 @@ export default function AIStudioScreen() {
             </ScrollView>
           </View>
 
-          {/* Textarea area */}
-          <View style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Text style={[styles.panelLabel, { color: colors.textTertiary }]}>YOUR CONTENT</Text>
+          {/* Main area: textarea grows, controls stay at bottom */}
+          <View style={{ flex: 1, padding: 12, flexDirection: 'column' }}>
+            <Text style={[styles.panelLabel, { color: colors.textTertiary, marginBottom: 8 }]}>YOUR CONTENT</Text>
 
-            <View style={[styles.textareaBox, { backgroundColor: colors.bg, borderColor: colors.border, flex: 1 }]}>
+            {/* Textarea — takes all remaining vertical space */}
+            <View style={[styles.textareaBox, { backgroundColor: colors.bg, borderColor: colors.border, flex: 1, minHeight: 80 }]}>
               {isWeb && (
                 <NativeInput value={content} onChange={setContent}
-                  placeholder={`Paste your notes, text, or study material here…\n\nOr drag & drop a .txt or .md file onto the window.`}
+                  placeholder={'Paste notes or study material here…\n\nDrag & drop a .txt file anywhere to auto-analyze.'}
                   multiline
-                  inputStyle={{ color: colors.text, minHeight: 120 }} />
+                  inputStyle={{ color: colors.text }} />
               )}
             </View>
 
-            {/* File upload hint */}
-            <View style={[styles.dropHint, { borderColor: colors.border, backgroundColor: colors.bg }]}>
-              <Upload size={13} color={colors.textTertiary} />
-              <Text style={{ fontSize: 12, color: colors.textTertiary }}>Drag & drop a file anywhere to auto-analyze</Text>
-            </View>
+            {/* Bottom controls — never pushed off screen */}
+            <View style={{ flexShrink: 0, marginTop: 10 }}>
+              {/* Options row */}
+              <View style={[styles.optRow, { marginBottom: 8 }]}>
+                {tool === 'summarize' && (<>
+                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Length:</Text>
+                  {(['short','medium','long'] as const).map(l => <Pill key={l} label={l} active={summaryLen===l} onPress={()=>setSummaryLen(l)} />)}
+                </>)}
+                {tool === 'explain' && (<>
+                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Level:</Text>
+                  {(['beginner','intermediate','advanced'] as const).map(l => <Pill key={l} label={l} active={explainLvl===l} onPress={()=>setExplainLvl(l)} />)}
+                </>)}
+                {tool === 'flashcards' && (<>
+                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Cards:</Text>
+                  {[3,5,8,10].map(n => <Pill key={n} label={`${n}`} active={cardCount===n} onPress={()=>setCardCount(n)} />)}
+                </>)}
+                {tool === 'quiz' && (<>
+                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Questions:</Text>
+                  {[3,5,10].map(n => <Pill key={n} label={`${n}`} active={quizCount===n} onPress={()=>setQuizCount(n)} />)}
+                </>)}
+                {tool === 'writing' && (<>
+                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Style:</Text>
+                  {(['clarity','formal','concise','humanize'] as const).map(o => <Pill key={o} label={o} active={writeStyle===o} onPress={()=>setWriteStyle(o)} />)}
+                </>)}
+              </View>
 
-            {/* Options row */}
-            <View style={[styles.optRow, { flexShrink: 0 }]}>
-              {tool === 'summarize' && (<>
-                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Length:</Text>
-                {(['short','medium','long'] as const).map(l => <Pill key={l} label={l} active={summaryLen===l} onPress={()=>setSummaryLen(l)} />)}
-              </>)}
-              {tool === 'explain' && (<>
-                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Level:</Text>
-                {(['beginner','intermediate','advanced'] as const).map(l => <Pill key={l} label={l} active={explainLvl===l} onPress={()=>setExplainLvl(l)} />)}
-              </>)}
-              {tool === 'flashcards' && (<>
-                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Cards:</Text>
-                {[3,5,8,10].map(n => <Pill key={n} label={`${n}`} active={cardCount===n} onPress={()=>setCardCount(n)} />)}
-              </>)}
-              {tool === 'quiz' && (<>
-                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Questions:</Text>
-                {[3,5,10].map(n => <Pill key={n} label={`${n}`} active={quizCount===n} onPress={()=>setQuizCount(n)} />)}
-              </>)}
-              {tool === 'writing' && (<>
-                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Style:</Text>
-                {(['clarity','formal','concise','humanize'] as const).map(o => <Pill key={o} label={o} active={writeStyle===o} onPress={()=>setWriteStyle(o)} />)}
-              </>)}
+              {/* Generate button */}
+              <TouchableOpacity onPress={generate} disabled={loading || !content.trim()}
+                style={[styles.genBtn, { backgroundColor: content.trim() ? cur.color : colors.border }]}>
+                {loading
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.genTxt}>Generate {cur.label}</Text>}
+              </TouchableOpacity>
             </View>
-
-            {/* Generate button */}
-            <TouchableOpacity onPress={generate} disabled={loading || !content.trim()}
-              style={[styles.genBtn, { backgroundColor: content.trim() ? cur.color : colors.border }]}>
-              {loading
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.genTxt}>Generate {cur.label}</Text>}
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -425,7 +423,6 @@ const styles = StyleSheet.create({
   panelHeader: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:10, borderBottomWidth:0.5 },
   panelLabel:  { fontSize:11, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.8 },
   textareaBox: { borderWidth:0.5, borderRadius:12, padding:14 },
-  dropHint:    { flexDirection:'row', alignItems:'center', gap:6, borderWidth:1, borderStyle:'dashed' as any, borderRadius:8, padding:10 },
   optRow:      { flexDirection:'row', alignItems:'center', flexWrap:'wrap', gap:8 },
   optLabel:    { fontSize:13, fontWeight:'500' },
   genBtn:      { paddingVertical:12, borderRadius:12, alignItems:'center', justifyContent:'center' },
