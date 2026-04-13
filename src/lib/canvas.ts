@@ -19,7 +19,10 @@ export const canvas = {
   },
 
   getCourses: async (token: string) => {
-    const res = await fetch(`${BASE}/api/v1/courses?enrollment_state=active&per_page=50`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(
+      `${BASE}/api/v1/courses?enrollment_state=active&per_page=50&include[]=total_scores&include[]=current_grading_period_scores`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     if (!res.ok) throw new Error('Failed to fetch courses');
     return res.json();
   },
@@ -56,12 +59,20 @@ export const canvas = {
   },
 };
 
+export interface CanvasCourseEnrollment {
+  computed_current_score: number | null;
+  computed_final_score:   number | null;
+  computed_current_grade: string | null;
+  computed_final_grade:   string | null;
+}
+
 export interface CanvasCourse {
   id: number;
   name: string;
   course_code: string;
   start_at: string;
   end_at: string;
+  enrollments?: CanvasCourseEnrollment[];
 }
 
 export interface CanvasAssignment {

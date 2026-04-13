@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SignIn, SignUp } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/clerk-expo';
+import { SignIn, SignUp } from '@clerk/clerk-expo/web';
+import { useAuthStore } from '../store/auth';
 import {
   Zap, FileText, CheckSquare, Timer,
   BookOpen, TrendingUp, X, ArrowRight, Sparkles,
@@ -11,6 +13,15 @@ import {
 function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: 'in' | 'up' }) {
   const router = useRouter();
   const [tab, setTab] = useState<'in' | 'up'>(defaultTab);
+  const { isSignedIn } = useAuth();
+  const { hasOnboarded } = useAuthStore();
+
+  // When Clerk completes sign-in (state change from false → true), redirect
+  useEffect(() => {
+    if (isSignedIn) {
+      router.replace(hasOnboarded ? '/home' : '/onboarding');
+    }
+  }, [isSignedIn]);
 
   const overlayStyle: any = Platform.OS === 'web'
     ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000,
@@ -19,7 +30,7 @@ function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: '
     : { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
 
-  // Clerk appearance — match our dark theme
+  // Clerk appearance — match our dark theme + hide their footer (we have our own tab switcher)
   const appearance = {
     variables: {
       colorPrimary: '#7c3aed',
@@ -44,8 +55,8 @@ function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: '
       formFieldInput:     { background: '#0f172a', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: '10px' },
       formFieldInputShowPasswordButton: { color: '#64748b' },
       formButtonPrimary:  { background: '#7c3aed', borderRadius: '12px', fontWeight: '700', fontSize: '15px' },
-      footerActionLink:   { color: '#a78bfa', fontWeight: '600' },
-      footerActionText:   { color: '#64748b' },
+      // Hide Clerk's own footer nav — we use our own tab switcher below
+      footer:             { display: 'none' },
       identityPreviewText:{ color: '#f1f5f9' },
       identityPreviewEditButton: { color: '#a78bfa' },
     },
@@ -72,22 +83,22 @@ function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: '
           <style>{`
             .cl-card { background: #18181f !important; }
             .cl-internal-b3fm6y { background: #18181f !important; }
+            .cl-footer { display: none !important; }
+            .cl-footerAction { display: none !important; }
           `}</style>
         )}
 
         {tab === 'in' ? (
           <SignIn
             appearance={appearance as any}
-            afterSignInUrl="/home"
-            signUpUrl="#"
-            signUpForceRedirectUrl="#"
+            routing="virtual"
+            afterSignInUrl="/"
           />
         ) : (
           <SignUp
             appearance={appearance as any}
-            afterSignUpUrl="/onboarding"
-            signInUrl="#"
-            signInForceRedirectUrl="#"
+            routing="virtual"
+            afterSignUpUrl="/"
           />
         )}
 
@@ -120,7 +131,16 @@ const FEATURES = [
 /* ── Landing page ── */
 export default function LandingPage() {
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { hasOnboarded } = useAuthStore();
   const [modal, setModal] = useState<{ open: boolean; tab: 'in' | 'up' }>({ open: false, tab: 'in' });
+
+  // Already signed in — skip landing
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      router.replace(hasOnboarded ? '/home' : '/onboarding');
+    }
+  }, [isLoaded, isSignedIn]);
 
   const open = (tab: 'in' | 'up') => setModal({ open: true, tab });
 

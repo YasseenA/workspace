@@ -6,8 +6,10 @@ import { useCanvasStore } from '../../store/canvas';
 import { useTasksStore } from '../../store/tasks';
 import { Card, Button, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
+import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { fmt } from '../../utils/helpers';
+import WebViewer from '../../components/ui/WebViewer';
 
 export default function CanvasScreen() {
   const colors = useColors();
@@ -19,6 +21,8 @@ export default function CanvasScreen() {
   const [connectError, setConnectError] = useState('');
   const [importing, setImporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'courses'>('upcoming');
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [viewerTitle, setViewerTitle] = useState<string | undefined>(undefined);
 
   const handleConnect = async () => {
     if (!token.trim()) { setConnectError('Please paste your Canvas access token.'); return; }
@@ -60,7 +64,8 @@ export default function CanvasScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <TopBar />
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, paddingTop: Platform.OS === 'web' ? 60 : 16 }} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -200,9 +205,13 @@ export default function CanvasScreen() {
                         </View>
                       </View>
                       {a.html_url && (
-                        <TouchableOpacity onPress={() => { if (Platform.OS === 'web') window.open(a.html_url, '_blank'); }}
-                          style={{ padding: 6 }}>
-                          <ExternalLink size={15} color={colors.textTertiary} />
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (Platform.OS === 'web') { setViewerTitle(a.name); setViewerUrl(a.html_url); }
+                            else window.open?.(a.html_url, '_blank');
+                          }}
+                          style={[styles.viewBtn, { backgroundColor: colors.primaryLight }]}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>View</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -237,6 +246,14 @@ export default function CanvasScreen() {
               courses.map(course => {
                 const courseAssignments = assignments.filter(a => a.course_id === course.id);
                 const upcoming = courseAssignments.filter(a => !a.due_at || new Date(a.due_at) > now);
+                const enrollment = course.enrollments?.[0];
+                const currentScore = enrollment?.computed_current_score;
+                const currentGrade = enrollment?.computed_current_grade;
+                const gradeColor = currentScore == null ? colors.textTertiary
+                  : currentScore >= 90 ? colors.success
+                  : currentScore >= 80 ? colors.primary
+                  : currentScore >= 70 ? colors.warning
+                  : colors.error;
                 return (
                   <View key={course.id} style={[styles.courseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: upcoming.length > 0 ? 10 : 0 }}>
@@ -247,7 +264,14 @@ export default function CanvasScreen() {
                         <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }} numberOfLines={1}>{course.name}</Text>
                         <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>{course.course_code}</Text>
                       </View>
-                      <Badge variant="neutral" size="sm">{courseAssignments.length} tasks</Badge>
+                      {currentScore != null ? (
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>{currentGrade ?? `${Math.round(currentScore)}%`}</Text>
+                          <Text style={{ fontSize: 10, color: colors.textTertiary }}>{Math.round(currentScore)}%</Text>
+                        </View>
+                      ) : (
+                        <Badge variant="neutral" size="sm">{courseAssignments.length} tasks</Badge>
+                      )}
                     </View>
                     {upcoming.slice(0, 2).map(a => {
                       const due = a.due_at ? fmt.dueDate(a.due_at) : null;
@@ -272,6 +296,11 @@ export default function CanvasScreen() {
       </ScrollView>
 
       <TabBar />
+
+      {/* In-app viewer */}
+      {viewerUrl && Platform.OS === 'web' && (
+        <WebViewer url={viewerUrl} title={viewerTitle} onClose={() => { setViewerUrl(null); setViewerTitle(undefined); }} />
+      )}
 
       {/* Token Modal */}
       {showModal && (
@@ -331,6 +360,7 @@ const styles = StyleSheet.create({
   courseIcon:    { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   courseAssign:  { flexDirection: 'row', alignItems: 'center', paddingTop: 9, paddingHorizontal: 2, borderTopWidth: 0.5, gap: 8, marginTop: 4 },
   emptyCard:     { borderRadius: 16, borderWidth: 0.5, padding: 24 },
+  viewBtn:       { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
   overlay:       { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modal:         { borderRadius: 24, padding: 24, width: '100%', maxWidth: 480 },
   tokenInput:    { borderWidth: 1, borderRadius: 12, padding: 13, fontSize: 13, minHeight: 80, fontFamily: 'monospace' },

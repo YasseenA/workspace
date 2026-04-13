@@ -177,3 +177,37 @@ If you get "Failed to fetch": ensure `node canvas-proxy.js` is running and resta
 - Don't define component functions inside render functions
 - Don't call the Anthropic API directly from the browser (CORS) — always use the proxy
 - Don't skip `--clear` when changing files in `src/lib/` — Metro caches aggressively
+
+## Current Development Status (as of 2026-04-12)
+
+### Completed features
+| Feature | File(s) |
+|---|---|
+| Tasks filter pills (no-scroll, fixed width) | `src/app/tasks/index.tsx` |
+| Notes sort (newest/oldest/alpha/words) + notebook color bars | `src/app/notes/index.tsx` |
+| Notes WYSIWYG editor (contenteditable + execCommand) | `src/app/notes/editor.tsx` |
+| Notes PDF export + share | `src/app/notes/editor.tsx` |
+| Global search screen | `src/app/search/index.tsx` |
+| Home: search button + due-soon notifications | `src/app/home/index.tsx` |
+| GPA calculator tab in grade calculator | `src/app/settings/grades.tsx` |
+| Syllabus parser tool in AI Studio | `src/app/ai-studio/index.tsx` |
+| Web Notification API utility | `src/lib/notifications.ts` |
+| Notifications toggle in settings store | `src/store/settings.ts` |
+| WebViewer component (iframe overlay) | `src/components/ui/WebViewer.tsx` |
+| Canvas assignments "View" button → WebViewer | `src/app/canvas/index.tsx` |
+| Study Buddy chat | `src/app/study-buddy/index.tsx`, `src/store/studyBuddy.ts` |
+
+### Pending features (next phases)
+1. **Email Draft UI** — `claude.emailDraft(context, type)` exists but no UI. Build at `/email` or as AI Studio tab. Types: `'professor' | 'extension' | 'internship' | 'group'`
+2. **Weekly Planner UI** — `claude.weeklyPlanner(tasks, hours)` exists but no UI. Could be home card or tasks tab
+3. **Offline mode** — Cache Canvas data; queue changes (complex, Phase 3)
+4. **iOS/Android store submission** (Phase 4)
+
+### Notes on the WYSIWYG editor
+- Notes are stored as HTML on web (when `content.includes('<') && content.includes('</') && content.includes('>')`)
+- Backward compat: on load, if no HTML tags detected, markdown is converted via `buildMarkdownHtml()`
+- `contenteditable` div is **uncontrolled** — read `innerHTML` via `onInput`, never set via React state after mount
+- `ceInitialized` ref prevents double-init
+- Toolbar uses `document.execCommand` (bold, italic, formatBlock h1/h2, lists, blockquote, pre)
+- CSS class `note-editor` applies visual styles for h1/h2/p/ul/ol/blockquote/code
+- `handleSave` captures `contentRef.current.innerHTML` before navigating back
