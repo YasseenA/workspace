@@ -5,11 +5,12 @@ import { Zap, Copy, Send, RotateCcw, Upload } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
+import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { claude } from '../../lib/claude';
 import { gptzero } from '../../lib/gptzero';
 
-type Tool = 'summarize' | 'explain' | 'flashcards' | 'quiz' | 'studyGuide' | 'writing' | 'aiCheck';
+type Tool = 'summarize' | 'explain' | 'flashcards' | 'quiz' | 'studyGuide' | 'writing' | 'aiCheck' | 'syllabus';
 type Msg  = { role: 'user' | 'assistant'; text: string; color?: string; isAction?: boolean };
 
 const TOOLS: { id: Tool; label: string; color: string }[] = [
@@ -20,7 +21,34 @@ const TOOLS: { id: Tool; label: string; color: string }[] = [
   { id: 'studyGuide', label: 'Study Guide', color: '#3b82f6' },
   { id: 'writing',    label: 'Writing',     color: '#ec4899' },
   { id: 'aiCheck',    label: 'AI Checker',  color: '#64748b' },
+  { id: 'syllabus',   label: 'Syllabus',    color: '#0ea5e9' },
 ];
+
+/* Jumping dots thinking indicator */
+function ThinkingDots({ color }: { color: string }) {
+  if (Platform.OS === 'web') {
+    return (
+      <>
+        <style>{`
+          @keyframes dotBounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+            30% { transform: translateY(-7px); opacity: 1; }
+          }
+          .td1 { animation: dotBounce 1.1s ease-in-out infinite; animation-delay: 0s; }
+          .td2 { animation: dotBounce 1.1s ease-in-out infinite; animation-delay: 0.18s; }
+          .td3 { animation: dotBounce 1.1s ease-in-out infinite; animation-delay: 0.36s; }
+        `}</style>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '4px 0' }}>
+          {['td1', 'td2', 'td3'].map(cls => (
+            <div key={cls} className={cls} style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }} />
+          ))}
+        </div>
+      </>
+    );
+  }
+  // Native fallback
+  return <ActivityIndicator size="small" color={color} style={{ alignSelf: 'flex-start' }} />;
+}
 
 /* Native HTML inputs — avoids GestureHandler swallowing keystrokes on web */
 function NativeInput({ value, onChange, placeholder, multiline = false, onEnter, rows = 10, color = 'inherit' }: any) {
@@ -61,12 +89,14 @@ export default function AIStudioScreen() {
   const [chatInput,  setChatInput]  = useState('');
   const [msgs,       setMsgs]       = useState<Msg[]>([]);
   const [loading,    setLoading]    = useState(false);
+  const streamIdx = useRef(-1);
   const [isDragging, setIsDragging] = useState(false);
 
-  const [canvasText, setCanvasText] = useState('');
-  const [flashcards, setFlashcards] = useState<{ front: string; back: string }[]>([]);
-  const [quiz,       setQuiz]       = useState<{ question: string; options: string[]; correct: number; explanation: string }[]>([]);
-  const [aiResult,   setAiResult]   = useState<any>(null);
+  const [canvasText,   setCanvasText]   = useState('');
+  const [flashcards,   setFlashcards]   = useState<{ front: string; back: string }[]>([]);
+  const [quiz,         setQuiz]         = useState<{ question: string; options: string[]; correct: number; explanation: string }[]>([]);
+  const [aiResult,     setAiResult]     = useState<any>(null);
+  const [syllabusData, setSyllabusData] = useState<{ dates: string[]; exams: string[]; assignments: string[]; books: string[]; officeHours: string; gradingPolicy: string } | null>(null);
   const [flipped,    setFlipped]    = useState<Set<number>>(new Set());
   const [selAns,     setSelAns]     = useState<Record<number, number>>({});
   const [shownAns,   setShownAns]   = useState<Record<number, boolean>>({});
@@ -84,7 +114,7 @@ export default function AIStudioScreen() {
   const cur       = TOOLS.find(t => t.id === tool)!;
 
   const clearCanvas = () => {
-    setCanvasText(''); setFlashcards([]); setQuiz([]); setAiResult(null);
+    setCanvasText(''); setFlashcards([]); setQuiz([]); setAiResult(null); setSyllabusData(null);
     setFlipped(new Set()); setSelAns({}); setShownAns({});
   };
 
@@ -137,38 +167,85 @@ export default function AIStudioScreen() {
       ? 'Proxy unreachable. Run: node canvas-proxy.js'
       : e.message || 'Something went wrong.';
 
+  // Push a streaming-capable assistant placeholder and return its index
+  const pushPlaceholder = (base: Msg[]): [Msg[], number] => {
+    const placeholder: Msg = { role: 'assistant', text: '', color: cur.color };
+    const next = [...base, placeholder];
+    return [next, next.length - 1];
+  };
+
+  // Append chunk to message at idx
+  const appendChunk = (idx: number, chunk: string) => {
+    setMsgs(prev => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], text: copy[idx].text + chunk };
+      return copy;
+    });
+    scroll();
+  };
+
   const generateWith = async (src: string) => {
     const hasImage = !!pastedImage;
     if (!src.trim() && !hasImage) return;
-    // User bubble shows the actual input (truncated) or image indicator
     const userPreview = hasImage
       ? `📷 Image${src.trim() ? ' + "' + src.slice(0, 60) + (src.length > 60 ? '…' : '') + '"' : ''}`
       : src.length > 100 ? src.slice(0, 100) + '…' : src;
-    const next: Msg[] = [...msgs, { role: 'user', text: userPreview, color: cur.color }];
-    setMsgs(next); setLoading(true); clearCanvas(); scroll();
+    const withUser: Msg[] = [...msgs, { role: 'user', text: userPreview, color: cur.color }];
+    clearCanvas(); scroll();
+
+    // For structured tools (flashcards, quiz, aiCheck, syllabus) keep old non-streaming path
+    const isStructured = tool === 'flashcards' || tool === 'quiz' || tool === 'aiCheck' || tool === 'syllabus';
+
+    if (isStructured) {
+      setMsgs(withUser); setLoading(true); streamIdx.current = -1;
+      try {
+        let reply = '';
+        if (hasImage) {
+          const { base64, mime } = pastedImage!;
+          if (tool === 'flashcards') { const c = await claude.flashcardsFromImage(base64, mime, cardCount); setFlashcards(c); reply = `Generated ${c.length} flashcards from your image.`; }
+          if (tool === 'quiz')       { const q = await claude.quizFromImage(base64, mime, quizCount);       setQuiz(q);       reply = `Generated ${q.length} quiz questions from your image.`; }
+          if (tool === 'aiCheck')    { reply = 'AI detection requires text — please paste the text content directly.'; }
+          if (tool === 'syllabus')   { reply = 'Syllabus parsing requires text — please paste the syllabus text directly.'; }
+        } else {
+          if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount); setFlashcards(c); reply = `Generated ${c.length} flashcards — tap any card to flip it.`; }
+          if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);       setQuiz(q);       reply = `Generated ${q.length} quiz questions — pick your answers below.`; }
+          if (tool === 'aiCheck')    { const r = await gptzero.check(src); setAiResult(r); reply = `AI Detection: ${Math.round(r.score * 100)}% AI probability — ${r.label}`; }
+          if (tool === 'syllabus')   {
+            const s = await claude.parseSyllabus(src);
+            setSyllabusData(s);
+            const totalItems = (s.dates?.length || 0) + (s.exams?.length || 0) + (s.assignments?.length || 0);
+            reply = `Parsed syllabus — found ${totalItems} key dates/items. See the breakdown below.`;
+          }
+        }
+        setMsgs([...withUser, { role: 'assistant', text: reply, color: cur.color }]);
+      } catch (e: any) {
+        setMsgs([...withUser, { role: 'assistant', text: '⚠️ ' + errMsg(e), color: cur.color }]);
+      } finally { setLoading(false); scroll(); }
+      return;
+    }
+
+    // Streaming path for text tools
+    const [withPlaceholder, idx] = pushPlaceholder(withUser);
+    setMsgs(withPlaceholder); setLoading(true);
+    streamIdx.current = idx;
     try {
-      let reply = '';
       if (hasImage) {
         const { base64, mime } = pastedImage!;
-        if (tool === 'summarize')  { reply = await claude.summarizeImage(base64, mime, summaryLen); }
-        if (tool === 'explain')    { reply = await claude.explainImage(base64, mime, explainLvl); }
-        if (tool === 'flashcards') { const c = await claude.flashcardsFromImage(base64, mime, cardCount); setFlashcards(c); reply = `Generated ${c.length} flashcards from your image.`; }
-        if (tool === 'quiz')       { const q = await claude.quizFromImage(base64, mime, quizCount);       setQuiz(q);       reply = `Generated ${q.length} quiz questions from your image.`; }
-        if (tool === 'studyGuide') { reply = await claude.studyGuideFromImage(base64, mime); }
-        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle); }
-        if (tool === 'aiCheck')    { reply = 'AI detection requires text — please paste the text content directly.'; }
+        // Image tools don't stream — fall back to non-streaming then fill placeholder
+        let reply = '';
+        if (tool === 'summarize')  reply = await claude.summarizeImage(base64, mime, summaryLen);
+        if (tool === 'explain')    reply = await claude.explainImage(base64, mime, explainLvl);
+        if (tool === 'studyGuide') reply = await claude.studyGuideFromImage(base64, mime);
+        if (tool === 'writing')    reply = await claude.improveWriting(src, writeStyle);
+        setMsgs(prev => { const c = [...prev]; c[idx] = { ...c[idx], text: reply }; return c; });
       } else {
-        if (tool === 'summarize')  { reply = await claude.summarize(src, summaryLen); }
-        if (tool === 'explain')    { reply = await claude.explainSimply(src, explainLvl); }
-        if (tool === 'flashcards') { const c = await claude.generateFlashcards(src, cardCount); setFlashcards(c); reply = `Generated ${c.length} flashcards — tap any card to flip it.`; }
-        if (tool === 'quiz')       { const q = await claude.generateQuiz(src, quizCount);       setQuiz(q);       reply = `Generated ${q.length} quiz questions — pick your answers below.`; }
-        if (tool === 'studyGuide') { reply = await claude.generateStudyGuide(src); }
-        if (tool === 'writing')    { reply = await claude.improveWriting(src, writeStyle); }
-        if (tool === 'aiCheck')    { const r = await gptzero.check(src); setAiResult(r); reply = `AI Detection: ${Math.round(r.score * 100)}% AI probability — ${r.label}`; }
+        if (tool === 'summarize')  await claude.streamSummarize(src, summaryLen, chunk => appendChunk(idx, chunk));
+        if (tool === 'explain')    await claude.streamExplain(src, explainLvl, chunk => appendChunk(idx, chunk));
+        if (tool === 'studyGuide') await claude.streamStudyGuide(src, chunk => appendChunk(idx, chunk));
+        if (tool === 'writing')    await claude.streamImproveWriting(src, writeStyle, chunk => appendChunk(idx, chunk));
       }
-      setMsgs([...next, { role: 'assistant', text: reply, color: cur.color }]);
     } catch (e: any) {
-      setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e), color: cur.color }]);
+      setMsgs(prev => { const c = [...prev]; c[idx] = { ...c[idx], text: '⚠️ ' + errMsg(e) }; return c; });
     } finally { setLoading(false); scroll(); }
   };
 
@@ -178,13 +255,22 @@ export default function AIStudioScreen() {
     if (!chatInput.trim() || loading) return;
     const q   = chatInput.trim();
     const ctx = content ? `Context:\n${content}\n\n` : canvasText ? `Context:\n${canvasText}\n\n` : '';
-    const next: Msg[] = [...msgs, { role: 'user', text: q, color: cur.color }];
-    setMsgs(next); setChatInput(''); setLoading(true); scroll();
+    const withUser: Msg[] = [...msgs, { role: 'user', text: q, color: cur.color }];
+    const placeholder: Msg = { role: 'assistant', text: '' };
+    const withPlaceholder = [...withUser, placeholder];
+    const idx = withPlaceholder.length - 1;
+    setMsgs(withPlaceholder); setChatInput(''); setLoading(true); streamIdx.current = idx; scroll();
     try {
-      const r = await claude.explainSimply(`${ctx}${q}`, 'intermediate');
-      setMsgs([...next, { role: 'assistant', text: r }]);
+      const system = `You are a helpful AI study assistant. Answer clearly and helpfully. ${ctx ? 'The user has provided the following context:\n' + ctx : ''}`;
+      const history = withUser
+        .filter(m => !m.isAction)
+        .map(m => ({ role: m.role as 'user'|'assistant', content: m.text }));
+      await claude.chat(system, history, chunk => {
+        setMsgs(prev => { const c = [...prev]; c[idx] = { ...c[idx], text: c[idx].text + chunk }; return c; });
+        scroll();
+      });
     } catch (e: any) {
-      setMsgs([...next, { role: 'assistant', text: '⚠️ ' + errMsg(e) }]);
+      setMsgs(prev => { const c = [...prev]; c[idx] = { ...c[idx], text: '⚠️ ' + errMsg(e) }; return c; });
     } finally { setLoading(false); scroll(); }
   };
 
@@ -223,9 +309,10 @@ export default function AIStudioScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TopBar />
 
       {/* ── Thin title row — no full bar ── */}
-      <View style={[styles.titleRow, { borderBottomColor: colors.border }]}>
+      <View style={[styles.titleRow, { borderBottomColor: colors.border }, Platform.OS === 'web' && { marginTop: 50 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <View style={[styles.logoBox, { backgroundColor: colors.primary }]}>
             <Zap size={15} color="#fff" fill="#fff" />
@@ -298,6 +385,8 @@ export default function AIStudioScreen() {
 
             {msgs.filter(m => !m.isAction).map((m, i) => {
               const msgColor = m.color || cur.color;
+              const isStreaming = loading && streamIdx.current === i;
+              const isEmpty = m.text === '';
               return (
                 <View
                   key={i}
@@ -311,12 +400,18 @@ export default function AIStudioScreen() {
                   {m.role === 'assistant' && (
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                       <Text style={[styles.bubbleLbl, { color: msgColor }]}>Claude</Text>
-                      <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(m.text); }}>
-                        <Copy size={12} color={colors.textTertiary} />
-                      </TouchableOpacity>
+                      {isStreaming
+                        ? <ThinkingDots color={msgColor} />
+                        : <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(m.text); }}>
+                            <Copy size={12} color={colors.textTertiary} />
+                          </TouchableOpacity>
+                      }
                     </View>
                   )}
-                  <Text style={[styles.bubbleTxt, { color: m.role === 'user' ? '#fff' : colors.text }]}>{m.text}</Text>
+                  {m.role === 'assistant' && isStreaming && isEmpty
+                    ? <ThinkingDots color={msgColor} />
+                    : <Text style={[styles.bubbleTxt, { color: m.role === 'user' ? '#fff' : colors.text }]}>{m.text}</Text>
+                  }
                 </View>
               );
             })}
@@ -372,10 +467,48 @@ export default function AIStudioScreen() {
               </View>
             )}
 
-            {loading && (
+            {/* Syllabus parser output */}
+            {syllabusData && (
+              <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.bubbleLbl, { color: '#0ea5e9', marginBottom: 10 }]}>Syllabus Breakdown</Text>
+                {[
+                  { label: 'Important Dates', items: syllabusData.dates,       icon: '📅' },
+                  { label: 'Exams & Quizzes', items: syllabusData.exams,       icon: '📝' },
+                  { label: 'Assignments',     items: syllabusData.assignments, icon: '📋' },
+                  { label: 'Required Books',  items: syllabusData.books,       icon: '📚' },
+                ].map(section => section.items?.length > 0 && (
+                  <View key={section.label} style={{ marginBottom: 14 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0ea5e9', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      {section.icon} {section.label}
+                    </Text>
+                    {section.items.map((item, i) => (
+                      <View key={i} style={{ flexDirection: 'row', gap: 6, marginBottom: 4 }}>
+                        <Text style={{ color: colors.textTertiary, fontSize: 13 }}>•</Text>
+                        <Text style={{ fontSize: 13, color: colors.text, flex: 1, lineHeight: 20 }}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+                {syllabusData.officeHours ? (
+                  <View style={{ marginBottom: 10 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0ea5e9', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>🕐 Office Hours</Text>
+                    <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>{syllabusData.officeHours}</Text>
+                  </View>
+                ) : null}
+                {syllabusData.gradingPolicy ? (
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0ea5e9', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>📊 Grading Policy</Text>
+                    <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>{syllabusData.gradingPolicy}</Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            {/* Non-streaming loading bubble (flashcards / quiz / aiCheck / syllabus) */}
+            {loading && streamIdx.current === -1 && (
               <View style={[styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.bubbleLbl, { color: cur.color }]}>Claude</Text>
-                <ActivityIndicator size="small" color={cur.color} style={{ alignSelf: 'flex-start' }} />
+                <ThinkingDots color={cur.color} />
               </View>
             )}
           </ScrollView>
@@ -444,7 +577,7 @@ export default function AIStudioScreen() {
                     value={content}
                     onChange={(e: any) => setContent(e.target.value)}
                     onPaste={onTextareaPaste}
-                    placeholder={pastedImage ? 'Add optional context text…' : 'Paste notes, text, or an image here…\n\nYou can also drag & drop a .txt file.'}
+                    placeholder={pastedImage ? 'Add optional context text…' : tool === 'syllabus' ? 'Paste your syllabus text here…\n\nTip: copy the full course syllabus from Canvas or a PDF.' : 'Paste notes, text, or an image here…\n\nYou can also drag & drop a .txt file.'}
                     rows={pastedImage ? 4 : 12}
                     style={{
                       background: 'transparent', border: 'none', outline: 'none', resize: 'none',

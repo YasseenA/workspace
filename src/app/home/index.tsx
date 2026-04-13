@@ -1,23 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  RefreshControl, StyleSheet, Platform,
+  RefreshControl, StyleSheet, Platform, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   FileText, CheckSquare, Zap, Timer,
   Plus, ChevronRight, Clock, BookOpen,
-  Calendar, ArrowRight,
+  Calendar, ArrowRight, MessageCircle, RefreshCw, Search,
 } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
 import { useTasksStore } from '../../store/tasks';
 import { useFocusStore } from '../../store/focus';
 import { useCanvasStore } from '../../store/canvas';
+import { useSettingsStore } from '../../store/settings';
+import { requestPermission, notifyDueSoon } from '../../lib/notifications';
 import TabBar from '../../components/layout/TabBar';
+import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
+import { claude } from '../../lib/claude';
 import { fmt, priorityColor, initials } from '../../utils/helpers';
+
+const BRIEF_CACHE_KEY = 'home_daily_brief';
+const BRIEF_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+function loadBriefCache(): { text: string; ts: number } | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(BRIEF_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function saveBriefCache(text: string) {
+  try {
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ text, ts: Date.now() }));
+  } catch {}
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -27,13 +50,80 @@ export default function HomeScreen() {
   const { tasks } = useTasksStore();
   const { totalFocusMinutes } = useFocusStore();
   const { assignments, courses, connected: canvasConnected } = useCanvasStore();
+  const { notificationsEnabled } = useSettingsStore();
   const [refreshing, setRefreshing] = useState(false);
+
+  const [briefText,    setBriefText]    = useState('');
+  const [briefLoading, setBriefLoading] = useState(false);
+  const briefStarted = useRef(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await new Promise(r => setTimeout(r, 800));
     setRefreshing(false);
   };
+
+  const loadBrief = async (force = false) => {
+    if (briefLoading) return;
+    if (!force) {
+      const cached = loadBriefCache();
+      if (cached && Date.now() - cached.ts < BRIEF_TTL_MS) {
+        setBriefText(cached.text);
+        return;
+      }
+    } else {
+      saveBriefCache(''); // invalidate
+    }
+    setBriefText('');
+    setBriefLoading(true);
+    try {
+      const now = new Date();
+      const firstName = user?.firstName || 'Student';
+      const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const upcoming = assignments
+        .filter(a => a.due_at && new Date(a.due_at) > now && new Date(a.due_at) <= sevenDays)
+        .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
+        .slice(0, 4)
+        .map(a => `${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})`)
+        .join(', ');
+      const overdue = tasks.filter(t =>
+        t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now
+      ).map(t => t.title).slice(0, 3).join(', ');
+      const context = `It's ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. ${firstName} is a student with ${notes.length} notes and ${tasks.filter(t => t.status !== 'done').length} pending tasks.${upcoming ? ` Upcoming assignments: ${upcoming}.` : ''}${overdue ? ` Overdue tasks: ${overdue}.` : ''} Write a 2-sentence personalized daily brief about what they should focus on today.`;
+      let full = '';
+      await claude.dailyBrief(context, chunk => {
+        full += chunk;
+        setBriefText(full);
+      });
+      saveBriefCache(full);
+    } catch {
+      setBriefText('');
+    } finally {
+      setBriefLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (briefStarted.current) return;
+    briefStarted.current = true;
+    loadBrief();
+
+    // Request notification permission and fire due-soon alerts on web
+    if (Platform.OS === 'web' && notificationsEnabled) {
+      requestPermission().then(perm => {
+        if (perm !== 'granted') return;
+        const items = [
+          ...assignments
+            .filter(a => a.due_at)
+            .map(a => ({ id: `canvas-${a.id}`, title: a.name, dueAt: new Date(a.due_at!), kind: 'assignment' as const })),
+          ...tasks
+            .filter(t => t.status !== 'done' && t.dueDate)
+            .map(t => ({ id: `task-${t.id}`, title: t.title, dueAt: new Date(t.dueDate!), kind: 'task' as const })),
+        ];
+        notifyDueSoon(items);
+      });
+    }
+  }, []);
 
   const now      = new Date();
   const hour     = now.getHours();
@@ -85,8 +175,9 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TopBar />
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, Platform.OS === 'web' && { paddingTop: 50 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
@@ -100,12 +191,20 @@ export default function HomeScreen() {
               <Text style={styles.heroName}>{firstName} 👋</Text>
               <Text style={styles.heroDate}>{dateLabel}</Text>
             </View>
-            <TouchableOpacity
-              onPress={() => router.push('/settings')}
-              style={styles.heroAvatar}
-            >
-              <Text style={styles.heroAvatarText}>{initials(user?.fullName || user?.firstName || 'S')}</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => router.push('/search')}
+                style={[styles.heroAvatar, { backgroundColor: 'rgba(255,255,255,0.18)' }]}
+              >
+                <Search size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/settings')}
+                style={styles.heroAvatar}
+              >
+                <Text style={styles.heroAvatarText}>{initials(user?.fullName || user?.firstName || 'S')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Mini stats inside hero */}
@@ -159,6 +258,56 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* ── Study Buddy banner ── */}
+        <TouchableOpacity
+          onPress={() => router.push('/study-buddy' as any)}
+          style={[styles.buddyCard, { borderColor: '#7c3aed30' }]}
+          activeOpacity={0.85}
+        >
+          {Platform.OS === 'web'
+            ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #7c3aed18 0%, #4338ca10 100%)' }} />
+            : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#7c3aed0d' }} />
+          }
+          <View style={[styles.buddyIconWrap, { backgroundColor: '#7c3aed' }]}>
+            <MessageCircle size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.buddyTitle, { color: colors.text }]}>Study Buddy</Text>
+            <Text style={[styles.buddySub, { color: colors.textTertiary }]}>
+              AI tutor that knows your courses & assignments
+            </Text>
+          </View>
+          <ChevronRight size={16} color="#7c3aed" />
+        </TouchableOpacity>
+
+        {/* ── AI Daily Brief ── */}
+        {(briefLoading || briefText.length > 0) && (
+          <View style={[styles.briefCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.briefHeader}>
+              <View style={[styles.briefIcon, { backgroundColor: '#7c3aed18' }]}>
+                <Zap size={14} color="#7c3aed" fill="#7c3aed" />
+              </View>
+              <Text style={[styles.briefTitle, { color: colors.text }]}>Daily Brief</Text>
+              <TouchableOpacity
+                onPress={() => loadBrief(true)}
+                disabled={briefLoading}
+                style={{ marginLeft: 'auto' as any, padding: 4 }}
+              >
+                <RefreshCw size={13} color={briefLoading ? colors.textTertiary : colors.primary} />
+              </TouchableOpacity>
+            </View>
+            {briefLoading && briefText === ''
+              ? (
+                <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', paddingVertical: 2 }}>
+                  <ActivityIndicator size="small" color="#7c3aed" />
+                  <Text style={[styles.briefBody, { color: colors.textTertiary }]}>Thinking…</Text>
+                </View>
+              )
+              : <Text style={[styles.briefBody, { color: colors.textSecondary }]}>{briefText}</Text>
+            }
+          </View>
+        )}
 
         {/* ── Due today ── */}
         <View style={styles.sectionHeader}>
@@ -281,6 +430,39 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
           ))
+        )}
+
+        {/* ── Course Grades (Canvas) ── */}
+        {canvasConnected && courses.some(c => c.enrollments?.[0]?.computed_current_score != null) && (
+          <>
+            <View style={[styles.sectionHeader, { marginTop: 12 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Grades</Text>
+              <TouchableOpacity onPress={() => router.push('/canvas')} style={styles.seeAll}>
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>Canvas</Text>
+                <ChevronRight size={14} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {courses
+                .filter(c => c.enrollments?.[0]?.computed_current_score != null)
+                .slice(0, 6)
+                .map(c => {
+                  const score = c.enrollments![0].computed_current_score!;
+                  const grade = c.enrollments![0].computed_current_grade;
+                  const gc = score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error;
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => router.push('/canvas')}
+                      style={[styles.gradeCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    >
+                      <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
+                      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{c.course_code}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
+          </>
         )}
 
         {/* ── Pending Tasks ── */}
@@ -415,12 +597,39 @@ const styles = StyleSheet.create({
   noteTitle: { fontSize: 14, fontWeight: '600' },
   noteDate:  { fontSize: 11 },
 
+  /* Grade card */
+  gradeCard: {
+    flex: 1, minWidth: 90, alignItems: 'center', paddingVertical: 14,
+    borderRadius: 16, borderWidth: 0.5,
+  },
+
   /* Empty card */
   emptyCard: {
     alignItems: 'center', paddingVertical: 28,
     marginHorizontal: 16, marginBottom: 8,
     borderRadius: 20, borderWidth: 0.5,
   },
+
+  /* Study Buddy card */
+  buddyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 8, marginTop: 4,
+    borderRadius: 18, borderWidth: 1, padding: 14,
+    overflow: 'hidden', position: 'relative',
+  },
+  buddyIconWrap: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  buddyTitle:    { fontSize: 15, fontWeight: '700' },
+  buddySub:      { fontSize: 12, marginTop: 2 },
+
+  /* Daily Brief */
+  briefCard: {
+    marginHorizontal: 16, marginBottom: 8, marginTop: 4,
+    borderRadius: 18, borderWidth: 0.5, padding: 14,
+  },
+  briefHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  briefIcon:   { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  briefTitle:  { fontSize: 13, fontWeight: '700' },
+  briefBody:   { fontSize: 13, lineHeight: 21 },
 
   /* FAB */
   fab: {

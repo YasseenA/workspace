@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import { useTasksStore }   from '../../store/tasks';
 import { useFocusStore }   from '../../store/focus';
 import { useSettingsStore }from '../../store/settings';
 import TabBar from '../../components/layout/TabBar';
+import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { initials, showAlert } from '../../utils/helpers';
 
@@ -28,8 +29,7 @@ export default function SettingsScreen() {
   const { notes }                            = useNotesStore();
   const { tasks }                            = useTasksStore();
   const { sessions, totalFocusMinutes }      = useFocusStore();
-  const { darkMode, toggleDarkMode }         = useSettingsStore();
-  const [notifications, setNotifications]    = useState(true);
+  const { darkMode, toggleDarkMode, notificationsEnabled, setNotificationsEnabled } = useSettingsStore();
 
   const focusHrs    = Math.round(totalFocusMinutes / 60 * 10) / 10;
   const pendingTasks = tasks.filter(t => t.status !== 'done').length;
@@ -37,7 +37,7 @@ export default function SettingsScreen() {
   const handleLogout = () => {
     showAlert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { resetAppState(); await signOut(); router.replace('/auth/login'); } },
+      { text: 'Sign Out', style: 'destructive', onPress: async () => { resetAppState(); await signOut(); router.replace('/landing'); } },
     ]);
   };
 
@@ -76,7 +76,8 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+      <TopBar />
+      <ScrollView contentContainerStyle={{ paddingBottom: 110, paddingTop: Platform.OS === 'web' ? 50 : 0 }} showsVerticalScrollIndicator={false}>
 
         {/* ── Banner ── */}
         <View style={[styles.banner, gradientStyle]}>
@@ -137,7 +138,7 @@ export default function SettingsScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
 
           <Section title="ACCOUNT">
-            <Row icon={User}   iconColor={colors.primary} label="Edit Profile"       onPress={() => showAlert('Coming soon', 'Profile editing is coming in Phase 2!')} />
+            <Row icon={User}   iconColor={colors.primary} label="Edit Profile"       onPress={() => router.push('/settings/profile')} />
             <Row icon={Shield} iconColor="#8b5cf6"         label="Privacy & Security" onPress={() => showAlert('Coming soon')} last />
           </Section>
 
@@ -177,8 +178,8 @@ export default function SettingsScreen() {
               label="Notifications"
               right={
                 <Switch
-                  value={notifications}
-                  onValueChange={setNotifications}
+                  value={notificationsEnabled}
+                  onValueChange={setNotificationsEnabled}
                   trackColor={{ false: colors.border, true: colors.primary }}
                   thumbColor="#fff"
                 />

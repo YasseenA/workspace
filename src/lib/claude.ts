@@ -21,6 +21,67 @@ async function call(system: string, user: string, maxTokens = 2048): Promise<str
   return d.content?.[0]?.text || '';
 }
 
+// Parse SSE stream from an already-opened Response
+async function readStream(res: Response, onChunk: (text: string) => void): Promise<string> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '', buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+            fullText += parsed.delta.text;
+            onChunk(parsed.delta.text);
+          }
+        } catch {}
+      }
+    }
+  }
+  return fullText;
+}
+
+export async function streamCall(
+  system: string,
+  user: string,
+  onChunk: (text: string) => void,
+  maxTokens = 2048
+): Promise<string> {
+  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
+  if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, stream: true, system, messages: [{ role: 'user', content: user }] }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Claude error ${res.status}`); }
+  return readStream(res, onChunk);
+}
+
+export async function streamChat(
+  system: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  onChunk: (text: string) => void,
+  maxTokens = 2048
+): Promise<string> {
+  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
+  if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, stream: true, system, messages }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Claude error ${res.status}`); }
+  return readStream(res, onChunk);
+}
+
 async function callWithImage(system: string, userText: string, imageBase64: string, mediaType: string, maxTokens = 2048): Promise<string> {
   const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
   if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
@@ -91,6 +152,51 @@ export const claude = {
 
   weeklyPlanner: (tasks: string[], available: number) =>
     call('You are an expert academic planner.', `Create a weekly study plan.\nTasks: ${tasks.join(', ')}\nAvailable hours: ${available}\n\nReturn a practical day-by-day plan.`, 2000),
+
+  // ── Streaming text tools ──
+  streamSummarize: (text: string, length: 'short'|'medium'|'long' = 'medium', onChunk: (t: string) => void) =>
+    streamCall('You are an expert academic summarizer. Be clear and student-friendly.',
+      `Write a ${length==='short'?'2-3 sentence':length==='medium'?'1-2 paragraph':'comprehensive'} summary:\n\n${text}`,
+      onChunk),
+
+  streamExplain: (text: string, level: 'beginner'|'intermediate'|'advanced', onChunk: (t: string) => void) =>
+    streamCall('You are an expert tutor. Explain things clearly with real-world analogies.',
+      `Explain the following at a ${level} level:\n\n${text}`,
+      onChunk),
+
+  streamStudyGuide: (text: string, onChunk: (t: string) => void) =>
+    streamCall('You are an expert academic tutor.',
+      `Create a comprehensive study guide with key concepts, terms, main ideas, and review questions:\n\n${text}`,
+      onChunk, 3000),
+
+  streamImproveWriting: (text: string, style: 'clarity'|'formal'|'concise'|'humanize', onChunk: (t: string) => void) => {
+    const styleDesc = { clarity: 'clear and easy to understand', formal: 'formal and academic', concise: 'concise and to-the-point', humanize: 'natural and human-sounding' };
+    return streamCall(
+      'You are an expert writing assistant. If the input is a writing request or prompt, fulfill it and write the content. If the input is existing text to improve, rewrite it. Either way, return ONLY the final written content — no explanations, no preamble.',
+      `Style: ${styleDesc[style]}\n\nInput:\n${text}`,
+      onChunk
+    );
+  },
+
+  // Study Buddy — multi-turn streaming chat with app context injected as system prompt
+  chat: (system: string, messages: { role: 'user'|'assistant'; content: string }[], onChunk: (t: string) => void, maxTokens = 2048) =>
+    streamChat(system, messages, onChunk, maxTokens),
+
+  // Daily brief — short actionable snapshot for the home screen
+  dailyBrief: (context: string, onChunk: (t: string) => void) =>
+    streamCall(
+      'You are a helpful student assistant. Be concise, specific, and encouraging. No lists — just 2-3 natural sentences.',
+      context,
+      onChunk, 256
+    ),
+
+  // Assignment auto-brief — short TL;DR when opening an assignment modal
+  assignmentBrief: (name: string, description: string, points: number, dueDate: string, onChunk: (t: string) => void) =>
+    streamCall(
+      'You are a helpful student assistant. Give a 1-2 sentence plain-English summary of what this assignment requires.',
+      `Assignment: ${name}\nPoints: ${points}\nDue: ${dueDate}\nDescription: ${description || 'No description provided.'}`,
+      onChunk, 200
+    ),
 
   // Vision — image + optional extra text
   summarizeImage: (b64: string, mime: string, length: 'short'|'medium'|'long' = 'medium') =>

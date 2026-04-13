@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Platform, Vibration, ScrollView,
+  Platform, Vibration, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Play, Pause, RotateCcw, SlidersHorizontal, Coffee, Brain, Flame, Zap } from 'lucide-react-native';
 import { useFocusStore } from '../../store/focus';
 import TabBar from '../../components/layout/TabBar';
+import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { showAlert } from '../../utils/helpers';
 
@@ -18,8 +19,11 @@ export default function FocusScreen() {
   const [mode,               setMode]               = useState<Mode>('work');
   const [running,            setRunning]            = useState(false);
   const [seconds,            setSeconds]            = useState(workMinutes * 60);
+  const [sessionTotal,       setSessionTotal]       = useState(workMinutes * 60);
   const [showSettings,       setShowSettings]       = useState(false);
   const [completedSessions,  setCompletedSessions]  = useState(0);
+  const [isEditing,          setIsEditing]          = useState(false);
+  const [editValue,          setEditValue]          = useState('');
   const intervalRef = useRef<any>(null);
 
   useEffect(() => {
@@ -62,14 +66,58 @@ export default function FocusScreen() {
     }
   };
 
-  const reset      = () => { setRunning(false); setSeconds((mode === 'work' ? workMinutes : breakMinutes) * 60); };
-  const toggle     = () => setRunning(!running);
-  const switchMode = (m: Mode) => { setRunning(false); setMode(m); setSeconds((m === 'work' ? workMinutes : breakMinutes) * 60); };
+  const reset = () => {
+    const base = (mode === 'work' ? workMinutes : breakMinutes) * 60;
+    setRunning(false); setSeconds(base); setSessionTotal(base);
+  };
+  const toggle = () => {
+    if (!running) setSessionTotal(seconds); // lock in current time as the session's total
+    setRunning(!running);
+  };
+  const switchMode = (m: Mode) => {
+    const base = (m === 'work' ? workMinutes : breakMinutes) * 60;
+    setRunning(false); setMode(m); setSeconds(base); setSessionTotal(base);
+  };
 
-  const mins           = Math.floor(seconds / 60);
+  const startEditing = () => {
+    if (running) return;
+    const totalMins = Math.round(seconds / 60);
+    if (totalMins >= 60) {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      setEditValue(`${h}:${String(m).padStart(2, '0')}`);
+    } else {
+      setEditValue(String(totalMins));
+    }
+    setIsEditing(true);
+  };
+  const commitEdit = () => {
+    const raw = editValue.trim();
+    let totalSecs = 0;
+    if (raw.includes(':')) {
+      const parts = raw.split(':').map(p => parseInt(p) || 0);
+      if (parts.length === 3) {
+        // H:MM:SS
+        totalSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      } else {
+        // H:MM
+        totalSecs = parts[0] * 3600 + parts[1] * 60;
+      }
+    } else {
+      // plain number = minutes
+      totalSecs = Math.round(parseFloat(raw) * 60);
+    }
+    if (totalSecs > 0 && totalSecs <= 28800) { setSeconds(totalSecs); setSessionTotal(totalSecs); }
+    setIsEditing(false);
+  };
+
+  const hrs            = Math.floor(seconds / 3600);
+  const mins           = Math.floor((seconds % 3600) / 60);
   const secs           = seconds % 60;
-  const totalSeconds   = (mode === 'work' ? workMinutes : breakMinutes) * 60;
-  const progress       = totalSeconds > 0 ? (totalSeconds - seconds) / totalSeconds : 0;
+  const timeLabel      = hrs > 0
+    ? `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const progress       = sessionTotal > 0 ? Math.max(0, Math.min(1, (sessionTotal - seconds) / sessionTotal)) : 0;
   const R              = 112;
   const circumference  = 2 * Math.PI * R;
   const dashOffset     = circumference * (1 - progress);
@@ -78,8 +126,9 @@ export default function FocusScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TopBar />
       <ScrollView
-        contentContainerStyle={[styles.container]}
+        contentContainerStyle={[styles.container, Platform.OS === 'web' && { paddingTop: 54 }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
@@ -148,11 +197,44 @@ export default function FocusScreen() {
           )}
 
           <View style={[styles.innerCircle, { backgroundColor: mode === 'work' ? colors.primaryLight : colors.success + '18' }]}>
-            <Text style={[styles.timerDisplay, { color: mode === 'work' ? colors.primary : colors.success }]}>
-              {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-            </Text>
+            {isEditing ? (
+              Platform.OS === 'web' ? (
+                // @ts-ignore
+                <input
+                  type="number"
+                  value={editValue}
+                  onChange={(e: any) => setEditValue(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={(e: any) => e.key === 'Enter' && commitEdit()}
+                  autoFocus
+                  min={1}
+                  max={480}
+                  placeholder="25"
+                  style={{
+                    fontSize: 52, fontWeight: '800', letterSpacing: -1, textAlign: 'center',
+                    color: ringColor, background: 'transparent', border: 'none', outline: 'none',
+                    width: 140, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                  } as any}
+                />
+              ) : (
+                <TextInput
+                  value={editValue}
+                  onChangeText={setEditValue}
+                  onBlur={commitEdit}
+                  onSubmitEditing={commitEdit}
+                  autoFocus
+                  style={[styles.timerDisplay, { color: ringColor, borderBottomWidth: 2, borderBottomColor: ringColor }]}
+                />
+              )
+            ) : (
+              <TouchableOpacity onPress={startEditing} disabled={running} activeOpacity={running ? 1 : 0.7}>
+                <Text style={[styles.timerDisplay, { color: mode === 'work' ? colors.primary : colors.success, fontSize: hrs > 0 ? 40 : 56 }]}>
+                  {timeLabel}
+                </Text>
+              </TouchableOpacity>
+            )}
             <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>
-              {mode === 'work' ? 'Focus Time' : 'Break Time'}
+              {isEditing ? 'mins or H:MM · enter' : mode === 'work' ? 'Focus Time' : 'Break Time'}
             </Text>
             {running && (
               <View style={[styles.progressBadge, { backgroundColor: ringColor + '20' }]}>
@@ -187,7 +269,7 @@ export default function FocusScreen() {
           <View style={[styles.settingsPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Work duration</Text>
             <View style={styles.durationRow}>
-              {[15, 20, 25, 30, 45, 60].map(m => (
+              {[15, 20, 25, 30, 45, 60, 90, 120].map(m => (
                 <TouchableOpacity
                   key={m}
                   onPress={() => setWorkMinutes(m)}
@@ -200,7 +282,7 @@ export default function FocusScreen() {
                   ]}
                 >
                   <Text style={{ fontSize: 12, fontWeight: '600', color: workMinutes === m ? '#fff' : colors.textSecondary }}>
-                    {m}m
+                    {m >= 60 ? `${m / 60}h` : `${m}m`}
                   </Text>
                 </TouchableOpacity>
               ))}
