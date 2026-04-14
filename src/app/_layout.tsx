@@ -8,7 +8,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useSettingsStore } from '../store/settings';
 import { useDataSync } from '../hooks/useDataSync';
 
-const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+const CLERK_KEY = 'pk_live_Y2xlcmsud29ya3NwYWNlLWVkdS5jb20k';
 
 const tokenCache = {
   async getToken(key: string) {

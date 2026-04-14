@@ -174,7 +174,7 @@ export default function LandingPage() {
         <View style={styles.hero}>
           <View style={styles.heroBadge}>
             <Sparkles size={12} color="#a78bfa" />
-            <Text style={styles.heroBadgeTxt}>Built for Bellevue College students</Text>
+            <Text style={styles.heroBadgeTxt}>Built for college students</Text>
           </View>
           <Text style={styles.heroTitle}>Your academic life,{'\n'}organized.</Text>
           <Text style={styles.heroSub}>
@@ -214,7 +214,7 @@ export default function LandingPage() {
         {/* ── Bottom CTA ── */}
         <View style={styles.bottomCTA}>
           <Text style={styles.bottomTitle}>Ready to get organized?</Text>
-          <Text style={styles.bottomSub}>Join Bellevue College students already using Workspace</Text>
+          <Text style={styles.bottomSub}>Join students already using Workspace</Text>
           <TouchableOpacity onPress={() => open('up')} style={styles.heroCTA}>
             <Text style={styles.heroCTATxt}>Start for Free</Text>
             <ArrowRight size={16} color="#fff" />
@@ -227,7 +227,7 @@ export default function LandingPage() {
             <View style={[styles.navLogo, { width: 22, height: 22, borderRadius: 6 }]}>
               <Zap size={11} color="#fff" fill="#fff" />
             </View>
-            <Text style={{ color: '#475569', fontSize: 13 }}>Workspace · Bellevue College</Text>
+            <Text style={{ color: '#475569', fontSize: 13 }}>Workspace · Your Academic Hub</Text>
           </View>
           <Text style={{ color: '#334155', fontSize: 12 }}>Powered by Claude AI</Text>
         </View>

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 const CLIENT_ID = process.env.EXPO_PUBLIC_CANVAS_CLIENT_ID || '';
-const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'http://localhost:3001';
+const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'https://workspace-production-2fb5.up.railway.app';
 
 // Set by auth store when user profile loads — avoids reading from localStorage
 let _canvasBase = '';

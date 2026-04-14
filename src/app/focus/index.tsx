@@ -4,8 +4,10 @@ import {
   Platform, Vibration, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Play, Pause, RotateCcw, SlidersHorizontal, Coffee, Brain, Flame, Zap } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Play, Pause, RotateCcw, SlidersHorizontal, Coffee, Brain, Flame, Zap, CheckCircle2, X } from 'lucide-react-native';
 import { useFocusStore } from '../../store/focus';
+import { useTasksStore } from '../../store/tasks';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
@@ -14,8 +16,15 @@ import { showAlert } from '../../utils/helpers';
 type Mode = 'work' | 'break';
 
 export default function FocusScreen() {
+  const router = useRouter();
   const colors = useColors();
-  const { workMinutes, breakMinutes, sessions, totalFocusMinutes, streak, setWorkMinutes, setBreakMinutes, recordSession } = useFocusStore();
+  const {
+    workMinutes, breakMinutes, sessions, totalFocusMinutes, streak,
+    setWorkMinutes, setBreakMinutes, recordSession,
+    focusTaskId, focusTaskTitle, setFocusTask,
+  } = useFocusStore();
+  const { completeTask } = useTasksStore();
+
   const [mode,               setMode]               = useState<Mode>('work');
   const [running,            setRunning]            = useState(false);
   const [seconds,            setSeconds]            = useState(workMinutes * 60);
@@ -54,10 +63,41 @@ export default function FocusScreen() {
     if (mode === 'work') {
       recordSession(workMinutes);
       setCompletedSessions(c => c + 1);
-      showAlert('Session complete! 🎉', 'Great work. Time for a break.', [
-        { text: 'Start Break', onPress: () => { setMode('break'); setSeconds(breakMinutes * 60); setRunning(true); } },
-        { text: 'Skip',        style: 'cancel', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); } },
-      ]);
+
+      // If working on a specific task, offer to mark it done
+      if (focusTaskId && focusTaskTitle) {
+        showAlert(
+          'Session complete! 🎉',
+          `Great work on "${focusTaskTitle}"! Mark it as done?`,
+          [
+            {
+              text: 'Mark Done',
+              onPress: () => {
+                completeTask(focusTaskId);
+                setFocusTask(null, null);
+                showAlert('Task done! 🏆', 'Keep the momentum going.', [
+                  { text: 'Start Break', onPress: () => { setMode('break'); setSeconds(breakMinutes * 60); setRunning(true); } },
+                  { text: 'Next Task',   onPress: () => router.push('/tasks') },
+                ]);
+              },
+            },
+            {
+              text: 'Not yet',
+              onPress: () => {
+                showAlert('Nice work! ☕', 'Time for a break.', [
+                  { text: 'Start Break', onPress: () => { setMode('break'); setSeconds(breakMinutes * 60); setRunning(true); } },
+                  { text: 'Skip',        style: 'cancel', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); } },
+                ]);
+              },
+            },
+          ]
+        );
+      } else {
+        showAlert('Session complete! 🎉', 'Great work. Time for a break.', [
+          { text: 'Start Break', onPress: () => { setMode('break'); setSeconds(breakMinutes * 60); setRunning(true); } },
+          { text: 'Skip',        style: 'cancel', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); } },
+        ]);
+      }
     } else {
       showAlert('Break over!', 'Ready for another session?', [
         { text: 'Start Working', onPress: () => { setMode('work'); setSeconds(workMinutes * 60); setRunning(true); } },
@@ -71,7 +111,7 @@ export default function FocusScreen() {
     setRunning(false); setSeconds(base); setSessionTotal(base);
   };
   const toggle = () => {
-    if (!running) setSessionTotal(seconds); // lock in current time as the session's total
+    if (!running) setSessionTotal(seconds);
     setRunning(!running);
   };
   const switchMode = (m: Mode) => {
@@ -97,14 +137,11 @@ export default function FocusScreen() {
     if (raw.includes(':')) {
       const parts = raw.split(':').map(p => parseInt(p) || 0);
       if (parts.length === 3) {
-        // H:MM:SS
         totalSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
       } else {
-        // H:MM
         totalSecs = parts[0] * 3600 + parts[1] * 60;
       }
     } else {
-      // plain number = minutes
       totalSecs = Math.round(parseFloat(raw) * 60);
     }
     if (totalSecs > 0 && totalSecs <= 28800) { setSeconds(totalSecs); setSessionTotal(totalSecs); }
@@ -148,6 +185,24 @@ export default function FocusScreen() {
             <SlidersHorizontal size={17} color={showSettings ? '#fff' : colors.textSecondary} />
           </TouchableOpacity>
         </View>
+
+        {/* Active task banner */}
+        {focusTaskTitle && mode === 'work' && (
+          <View style={[styles.taskBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '35' }]}>
+            <Brain size={14} color={colors.primary} />
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.primary }} numberOfLines={1}>
+              {focusTaskTitle}
+            </Text>
+            {!running && (
+              <TouchableOpacity
+                onPress={() => setFocusTask(null, null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <X size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Mode toggle */}
         <View style={[styles.modeRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -261,8 +316,27 @@ export default function FocusScreen() {
               ? <Pause size={32} color="#fff" />
               : <Play  size={32} color="#fff" fill="#fff" />}
           </TouchableOpacity>
-          <View style={{ width: 52 }} />
+          {/* Pick task button (only in work mode, not running) */}
+          {!running && mode === 'work' ? (
+            <TouchableOpacity
+              onPress={() => router.push('/tasks')}
+              style={[styles.sideBtn, { backgroundColor: focusTaskId ? colors.primaryLight : colors.card, borderColor: focusTaskId ? colors.primary : colors.border }]}
+            >
+              <CheckCircle2 size={22} color={focusTaskId ? colors.primary : colors.textSecondary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 52 }} />
+          )}
         </View>
+
+        {/* Pick task hint */}
+        {!running && mode === 'work' && !focusTaskTitle && (
+          <TouchableOpacity onPress={() => router.push('/tasks')} activeOpacity={0.7}>
+            <Text style={{ fontSize: 13, color: colors.textTertiary, marginBottom: 16 }}>
+              Tap <Text style={{ color: colors.primary }}>✓</Text> to choose a task to focus on
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Settings panel */}
         {showSettings && (
@@ -350,9 +424,15 @@ export default function FocusScreen() {
 
 const styles = StyleSheet.create({
   container:  { alignItems: 'center', padding: 20, paddingTop: 4 },
-  titleRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 20 },
+  titleRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 },
   screenTitle:{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   settingsBtn:{ width: 40, height: 40, borderRadius: 13, borderWidth: 0.5, alignItems: 'center', justifyContent: 'center' },
+
+  taskBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    width: '100%', borderRadius: 14, borderWidth: 0.5,
+    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14,
+  },
 
   modeRow: {
     flexDirection: 'row', borderRadius: 16, borderWidth: 0.5,
@@ -371,7 +451,7 @@ const styles = StyleSheet.create({
   timerLabel:  { fontSize: 13, marginTop: 4 },
   progressBadge:{ marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
 
-  controls:  { flexDirection: 'row', alignItems: 'center', gap: 28, marginBottom: 24 },
+  controls:  { flexDirection: 'row', alignItems: 'center', gap: 28, marginBottom: 10 },
   sideBtn:   { width: 52, height: 52, borderRadius: 26, borderWidth: 0.5, alignItems: 'center', justifyContent: 'center' },
   playBtn:   { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 6 },
 

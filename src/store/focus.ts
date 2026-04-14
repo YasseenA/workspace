@@ -5,16 +5,20 @@ interface FocusState {
   workMinutes: number; breakMinutes: number; sessions: number;
   totalFocusMinutes: number; streak: number; lastSessionDate: string | null;
   userId: string | null;
+  // Active task being focused on
+  focusTaskId: string | null; focusTaskTitle: string | null;
   loadForUser: (userId: string) => Promise<void>;
   setWorkMinutes: (m: number) => void;
   setBreakMinutes: (m: number) => void;
   recordSession: (minutes: number) => void;
+  setFocusTask: (id: string | null, title: string | null) => void;
   clear: () => void;
 }
 
 export const useFocusStore = create<FocusState>()((set, get) => ({
   workMinutes: 25, breakMinutes: 5, sessions: 0,
   totalFocusMinutes: 0, streak: 0, lastSessionDate: null, userId: null,
+  focusTaskId: null, focusTaskTitle: null,
 
   loadForUser: async (userId) => {
     set({ userId });
@@ -61,5 +65,6 @@ export const useFocusStore = create<FocusState>()((set, get) => ({
     }).eq('user_id', userId).then();
   },
 
-  clear: () => set({ workMinutes: 25, breakMinutes: 5, sessions: 0, totalFocusMinutes: 0, streak: 0, lastSessionDate: null, userId: null }),
+  setFocusTask: (id, title) => set({ focusTaskId: id, focusTaskTitle: title }),
+  clear: () => set({ workMinutes: 25, breakMinutes: 5, sessions: 0, totalFocusMinutes: 0, streak: 0, lastSessionDate: null, userId: null, focusTaskId: null, focusTaskTitle: null }),
 }));

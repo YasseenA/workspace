@@ -19,12 +19,12 @@ export default function TopBar() {
       { backgroundColor: colors.card, borderBottomColor: colors.border },
     ]}>
       {/* Logo */}
-      <View style={styles.logo}>
+      <TouchableOpacity onPress={() => router.push('/')} style={styles.logo} activeOpacity={0.7}>
         <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
           <Zap size={14} color="#fff" fill="#fff" />
         </View>
         <Text style={[styles.logoText, { color: colors.text }]}>Workspace</Text>
-      </View>
+      </TouchableOpacity>
 
       {/* Account avatar */}
       <TouchableOpacity

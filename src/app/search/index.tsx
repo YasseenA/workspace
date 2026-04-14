@@ -12,11 +12,12 @@ import {
 import { useNotesStore } from '../../store/notes';
 import { useTasksStore } from '../../store/tasks';
 import { useCanvasStore } from '../../store/canvas';
+import { useTeamsStore }  from '../../store/teams';
 import { useColors } from '../../lib/theme';
 import TopBar from '../../components/layout/TopBar';
 import { fmt } from '../../utils/helpers';
 
-type ResultKind = 'note' | 'task' | 'assignment';
+type ResultKind = 'note' | 'task' | 'assignment' | 'teams';
 
 interface SearchResult {
   id: string;
@@ -58,12 +59,14 @@ const KIND_COLORS: Record<ResultKind, string> = {
   note:       '#7c3aed',
   task:       '#3b82f6',
   assignment: '#10b981',
+  teams:      '#5865f2',
 };
 
 const KIND_LABELS: Record<ResultKind, string> = {
   note:       'Note',
   task:       'Task',
-  assignment: 'Assignment',
+  assignment: 'Canvas',
+  teams:      'Teams',
 };
 
 function highlight(text: string, query: string, textColor: string, accentColor: string): React.ReactNode {
@@ -85,6 +88,7 @@ export default function SearchScreen() {
   const { notes } = useNotesStore();
   const { tasks } = useTasksStore();
   const { assignments, connected: canvasConnected } = useCanvasStore();
+  const { assignments: teamsAssignments, connected: teamsConnected } = useTeamsStore();
 
   const [query,   setQuery]   = useState('');
   const [recent,  setRecent]  = useState<string[]>(() => loadRecent());
@@ -149,6 +153,21 @@ export default function SearchScreen() {
       });
     }
 
+    // Teams assignments
+    if (teamsConnected) {
+      teamsAssignments.forEach(a => {
+        if (a.displayName.toLowerCase().includes(q)) {
+          out.push({
+            id: a.id,
+            kind: 'teams',
+            title: a.displayName,
+            subtitle: a.dueDateTime ? `Due ${new Date(a.dueDateTime).toLocaleDateString()}` : 'No due date',
+            meta: a.className,
+          });
+        }
+      });
+    }
+
     return out;
   }, [query, notes, tasks, assignments, canvasConnected]);
 
@@ -181,7 +200,7 @@ export default function SearchScreen() {
     }
   };
 
-  const kindOrder: ResultKind[] = ['note', 'task', 'assignment'];
+  const kindOrder: ResultKind[] = ['note', 'task', 'assignment', 'teams'];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>

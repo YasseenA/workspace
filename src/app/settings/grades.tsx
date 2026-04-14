@@ -72,6 +72,7 @@ export default function GradeCalculator() {
   const [whatIf,         setWhatIf]         = useState<Record<number, string>>({});
   const [manualRows,     setManualRows]     = useState<ManualAssignment[]>(DEFAULT_MANUAL);
   const [gpaCourses,     setGpaCourses]     = useState<ManualGPACourse[]>(DEFAULT_GPA_COURSES);
+  const [targetGrade,    setTargetGrade]    = useState<number | null>(null);
 
   const submissionMap = useMemo(() => {
     const m = new Map<number, typeof submissions[0]>();
@@ -122,6 +123,28 @@ export default function GradeCalculator() {
       totalCount:   courseAssignments.length,
     };
   }, [courseAssignments, submissionMap, whatIf]);
+
+  // Target grade calculator (Canvas mode)
+  const targetCalc = useMemo(() => {
+    if (targetGrade == null || !selectedCourse) return null;
+    let earnedSoFar = 0, possibleSoFar = 0, remainingPossible = 0;
+    for (const a of courseAssignments) {
+      const sub = submissionMap.get(a.id);
+      const pts = a.points_possible ?? 0;
+      if (pts <= 0) continue;
+      if (sub?.score != null && sub.workflow_state === 'graded') {
+        earnedSoFar    += sub.score;
+        possibleSoFar  += pts;
+      } else {
+        remainingPossible += pts;
+      }
+    }
+    const totalPossible = possibleSoFar + remainingPossible;
+    if (totalPossible === 0 || remainingPossible === 0) return null;
+    const needed = (targetGrade / 100) * totalPossible - earnedSoFar;
+    const neededPct = (needed / remainingPossible) * 100;
+    return { neededPct, remainingPossible, totalPossible };
+  }, [targetGrade, selectedCourse, courseAssignments, submissionMap]);
 
   // Manual mode
   const manualTotal   = manualRows.reduce((s, a) => s + (parseFloat(a.weight) || 0), 0);
@@ -315,6 +338,85 @@ export default function GradeCalculator() {
                         </Text>
                       </TouchableOpacity>
                     )}
+
+                    {/* Target grade calculator */}
+                    <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>WHAT SCORE DO I NEED?</Text>
+                    <View style={[styles.targetCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 10 }}>
+                        Choose a target final grade:
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                        {[
+                          { pct: 93, label: 'A  (93%)' },
+                          { pct: 90, label: 'A- (90%)' },
+                          { pct: 83, label: 'B  (83%)' },
+                          { pct: 80, label: 'B- (80%)' },
+                          { pct: 73, label: 'C  (73%)' },
+                          { pct: 70, label: 'C- (70%)' },
+                        ].map(({ pct, label }) => (
+                          <TouchableOpacity
+                            key={pct}
+                            onPress={() => setTargetGrade(targetGrade === pct ? null : pct)}
+                            style={[
+                              styles.targetBtn,
+                              {
+                                borderColor: targetGrade === pct ? colors.primary : colors.border,
+                                backgroundColor: targetGrade === pct ? colors.primary : 'transparent',
+                              },
+                            ]}
+                          >
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: targetGrade === pct ? '#fff' : colors.textSecondary }}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      {targetCalc && (
+                        <View style={[styles.targetResult, {
+                          backgroundColor: targetCalc.neededPct > 100 ? colors.error + '15' :
+                            targetCalc.neededPct <= 70 ? colors.success + '15' : colors.warning + '15',
+                          borderColor: targetCalc.neededPct > 100 ? colors.error + '40' :
+                            targetCalc.neededPct <= 70 ? colors.success + '40' : colors.warning + '40',
+                        }]}>
+                          {targetCalc.neededPct > 100 ? (
+                            <>
+                              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.error }}>
+                                Not achievable ✗
+                              </Text>
+                              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                                Even scoring 100% on all remaining work ({targetCalc.remainingPossible} pts) isn't enough to reach {targetGrade}%.
+                              </Text>
+                            </>
+                          ) : targetCalc.neededPct <= 0 ? (
+                            <>
+                              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.success }}>
+                                Already achieved! ✓
+                              </Text>
+                              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                                Your current grade already meets or exceeds {targetGrade}%.
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                                You need to average
+                              </Text>
+                              <Text style={{
+                                fontSize: 36, fontWeight: '800', letterSpacing: -1,
+                                color: targetCalc.neededPct > 100 ? colors.error :
+                                  targetCalc.neededPct >= 90 ? colors.warning : colors.success,
+                              }}>
+                                {Math.round(targetCalc.neededPct)}%
+                              </Text>
+                              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                                on the remaining {targetCalc.remainingPossible} points to finish at {targetGrade}%
+                              </Text>
+                            </>
+                          )}
+                        </View>
+                      )}
+                    </View>
 
                     {/* Assignment list */}
                     <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>ASSIGNMENTS</Text>
@@ -858,4 +960,8 @@ const styles = StyleSheet.create({
   closeBtn:    { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   courseRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 0.5, marginBottom: 8 },
   courseIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+
+  targetCard: { borderRadius: 18, borderWidth: 0.5, padding: 16, marginBottom: 16 },
+  targetBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  targetResult: { borderRadius: 14, borderWidth: 1, padding: 14, alignItems: 'center', gap: 4 },
 });

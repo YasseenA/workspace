@@ -4,13 +4,15 @@ import {
   Modal, TextInput, StyleSheet, Platform, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
   Plus, CheckCircle, Circle, Trash2,
   Flag, X, BookOpen, ExternalLink, Calendar,
-  Clock, ChevronRight, AlertCircle,
+  Clock, ChevronRight, AlertCircle, Timer,
 } from 'lucide-react-native';
 import { useTasksStore, Priority, Task } from '../../store/tasks';
 import { useCanvasStore } from '../../store/canvas';
+import { useFocusStore } from '../../store/focus';
 import { CanvasAssignment } from '../../lib/canvas';
 import { Badge, EmptyState, Button } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
@@ -36,18 +38,21 @@ const stripHtml = (s: string) =>
 type TaskRowProps = {
   item: Task;
   colors: any;
-  onComplete: (id: string) => void;
-  onRestore:  (id: string) => void;
-  onDelete:   (task: Task) => void;
+  activeFocusId: string | null;
+  onComplete:  (id: string) => void;
+  onRestore:   (id: string) => void;
+  onDelete:    (task: Task) => void;
+  onFocus:     (task: Task) => void;
 };
-function TaskRow({ item, colors, onComplete, onRestore, onDelete }: TaskRowProps) {
-  const due  = item.dueDate ? fmt.dueDate(item.dueDate) : null;
-  const done = item.status === 'done';
-  const pc   = priorityColor(item.priority);
+function TaskRow({ item, colors, activeFocusId, onComplete, onRestore, onDelete, onFocus }: TaskRowProps) {
+  const due      = item.dueDate ? fmt.dueDate(item.dueDate) : null;
+  const done     = item.status === 'done';
+  const pc       = priorityColor(item.priority);
+  const isFocused = activeFocusId === item.id;
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: isFocused ? colors.primary : colors.border }]}>
       {/* Priority bar */}
-      <View style={[styles.priorityStrip, { backgroundColor: pc }]} />
+      <View style={[styles.priorityStrip, { backgroundColor: isFocused ? colors.primary : pc }]} />
       <TouchableOpacity
         onPress={() => done ? onRestore(item.id) : onComplete(item.id)}
         style={{ padding: 2, marginLeft: 10 }}
@@ -80,8 +85,22 @@ function TaskRow({ item, colors, onComplete, onRestore, onDelete }: TaskRowProps
             </Badge>
           </View>
           {item.canvasId && <View style={{ flexShrink: 0 }}><Badge variant="primary" size="sm">Canvas</Badge></View>}
+          {isFocused && (
+            <View style={[{ flexShrink: 0, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.primaryLight }]}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>FOCUSING</Text>
+            </View>
+          )}
         </View>
       </View>
+      {!done && (
+        <TouchableOpacity
+          onPress={() => onFocus(item)}
+          style={{ padding: 8 }}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
+          <Timer size={16} color={isFocused ? colors.primary : colors.textTertiary} />
+        </TouchableOpacity>
+      )}
       <TouchableOpacity onPress={() => onDelete(item)} style={{ padding: 8 }}>
         <Trash2 size={15} color={colors.textTertiary} />
       </TouchableOpacity>
@@ -301,9 +320,11 @@ function AssignmentModal({ item, visible, onClose, colors, courseMap, submission
 
 /* ── Main screen ── */
 export default function TasksScreen() {
+  const router = useRouter();
   const colors = useColors();
   const { tasks, createTask, completeTask, deleteTask, updateTask } = useTasksStore();
   const { assignments, submissions, connected: canvasConnected, courses } = useCanvasStore();
+  const { focusTaskId, setFocusTask } = useFocusStore();
   const [filter,      setFilter]      = useState<Filter>('week');
   const [showAdd,     setShowAdd]     = useState(false);
   const [newTitle,    setNewTitle]    = useState('');
@@ -373,6 +394,11 @@ export default function TasksScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
     ]);
+  };
+
+  const handleFocus = (task: Task) => {
+    setFocusTask(task.id, task.title);
+    router.push('/focus');
   };
 
   const FILTERS: { key: Filter; label: string; count?: number }[] = [
@@ -461,9 +487,11 @@ export default function TasksScreen() {
             key={item.id}
             item={item}
             colors={colors}
+            activeFocusId={focusTaskId}
             onComplete={completeTask}
             onRestore={id => updateTask(id, { status: 'todo' })}
             onDelete={handleDelete}
+            onFocus={handleFocus}
           />
         ))}
 

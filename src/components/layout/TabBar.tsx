@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { Home, FileText, CheckSquare, Zap, Settings } from 'lucide-react-native';
+import { Home, FileText, CheckSquare, Calendar, Settings } from 'lucide-react-native';
 import { useColors } from '../../lib/theme';
 
 const TABS = [
   { id: 'home',     label: 'Home',     icon: Home,        route: '/home'      },
   { id: 'notes',    label: 'Notes',    icon: FileText,    route: '/notes'     },
   { id: 'tasks',    label: 'Tasks',    icon: CheckSquare, route: '/tasks'     },
-  { id: 'ai',       label: 'AI',       icon: Zap,         route: '/ai-studio' },
+  { id: 'calendar', label: 'Calendar', icon: Calendar,    route: '/calendar'  },
   { id: 'settings', label: 'Settings', icon: Settings,    route: '/settings'  },
 ];
 

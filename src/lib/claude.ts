@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 // On web, route through the proxy to bypass CORS.
 // EXPO_PUBLIC_PROXY_URL should be set to your deployed proxy in production.
 // On native (iOS/Android), call the API directly.
-const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'http://localhost:3001';
+const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'https://workspace-production-2fb5.up.railway.app';
 const API = Platform.OS === 'web'
   ? `${PROXY}/claude/messages`
   : 'https://api.anthropic.com/v1/messages';

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import type { CanvasCourse, CanvasAssignment } from './canvas';
 
-const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'http://localhost:3001';
+const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'https://workspace-production-2fb5.up.railway.app';
 
 // Unfold iCal line continuations (CRLF + space/tab = continued line)
 function unfold(ics: string): string {

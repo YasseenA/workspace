@@ -6,10 +6,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  Search, Plus, Pin, Star,
+  Search, Plus, Pin, Star, X,
   MoreVertical, Grid2x2, List, Trash2, BookOpen, FolderPlus,
-  ArrowUpDown, Clock, ArrowDownAZ, AlignLeft,
+  ArrowUpDown, Clock, ArrowDownAZ, AlignLeft, FileText, Share2,
 } from 'lucide-react-native';
+
+const NOTE_TEMPLATES = [
+  { emoji: '📚', label: 'Lecture Notes',  key: 'Lecture Notes' },
+  { emoji: '🧪', label: 'Study Guide',    key: 'Study Guide'   },
+  { emoji: '🧠', label: 'Cornell Notes',  key: 'Cornell Notes' },
+  { emoji: '📋', label: 'Meeting Notes',  key: 'Meeting Notes' },
+  { emoji: '✅', label: 'To-Do List',     key: 'To-Do List'    },
+];
 import { useNotesStore, Notebook } from '../../store/notes';
 import { EmptyState } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
@@ -35,12 +43,13 @@ type NoteCardProps = {
   togglePin: (id: string) => void;
   toggleFavorite: (id: string) => void;
   onDelete: (id: string) => void;
+  onShare: (id: string) => void;
   onPress: (id: string) => void;
   colors: ReturnType<typeof useColors>;
   notebookColor?: string;
 };
 
-function NoteCard({ item, viewMode, showMore, setShowMore, togglePin, toggleFavorite, onDelete, onPress, colors, notebookColor }: NoteCardProps) {
+function NoteCard({ item, viewMode, showMore, setShowMore, togglePin, toggleFavorite, onDelete, onShare, onPress, colors, notebookColor }: NoteCardProps) {
   return (
     <TouchableOpacity
       onPress={() => { setShowMore(null); onPress(item.id); }}
@@ -64,6 +73,11 @@ function NoteCard({ item, viewMode, showMore, setShowMore, togglePin, toggleFavo
             <TouchableOpacity onPress={() => { toggleFavorite(item.id); setShowMore(null); }} style={styles.menuItem}>
               <Star size={14} color={colors.warning} />
               <Text style={[styles.menuLabel, { color: colors.text }]}>{item.isFavorite ? 'Unfavorite' : 'Favorite'}</Text>
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity onPress={() => { onShare(item.id); setShowMore(null); }} style={styles.menuItem}>
+              <Share2 size={14} color={colors.primary} />
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Share</Text>
             </TouchableOpacity>
             <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
             <TouchableOpacity onPress={() => onDelete(item.id)} style={styles.menuItem}>
@@ -135,6 +149,7 @@ export default function NotesScreen() {
   const [showMore,       setShowMore]       = useState<string | null>(null);
   const [sort,           setSort]           = useState<SortKey>('newest');
   const [showSort,       setShowSort]       = useState(false);
+  const [showNewSheet,   setShowNewSheet]   = useState(false);
 
   // New notebook modal state
   const [nbModal,   setNbModal]   = useState(false);
@@ -177,6 +192,25 @@ export default function NotesScreen() {
     ]);
   };
 
+  const handleShare = (id: string) => {
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    const plainText = (note.content || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const shareText = `${note.title || 'Untitled'}\n\n${plainText}`;
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+      (navigator as any).share({ title: note.title || 'Note', text: shareText }).catch(() => {});
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(shareText).then(() => {
+        showAlert('Copied!', 'Note copied to clipboard.');
+      }).catch(() => showAlert('Share', shareText));
+    } else {
+      showAlert('Note', shareText);
+    }
+  };
+
   const handleCreateNotebook = () => {
     if (!nbName.trim()) return;
     createNotebook(nbName.trim(), nbColor);
@@ -210,7 +244,7 @@ export default function NotesScreen() {
               : <List    size={17} color={colors.textSecondary} />}
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => router.push('/notes/editor')}
+            onPress={() => setShowNewSheet(true)}
             style={[styles.addBtn, { backgroundColor: colors.primary }]}
           >
             <Plus size={18} color="#fff" strokeWidth={2.5} />
@@ -317,6 +351,7 @@ export default function NotesScreen() {
               togglePin={togglePin}
               toggleFavorite={toggleFavorite}
               onDelete={handleDelete}
+              onShare={handleShare}
               onPress={(id) => router.push({ pathname: '/notes/editor', params: { id } })}
               colors={colors}
               notebookColor={notebookColorMap[item.notebookId]}
@@ -332,11 +367,63 @@ export default function NotesScreen() {
 
       <TabBar />
       <TouchableOpacity
-        onPress={() => router.push('/notes/editor')}
+        onPress={() => setShowNewSheet(true)}
         style={[styles.fab, { backgroundColor: colors.primary }]}
       >
         <Plus size={24} color="#fff" strokeWidth={2.5} />
       </TouchableOpacity>
+
+      {/* New note / template picker */}
+      <Modal visible={showNewSheet} transparent animationType="slide" onRequestClose={() => setShowNewSheet(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setShowNewSheet(false)} />
+        <View style={[styles.newSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>New Note</Text>
+            <TouchableOpacity onPress={() => setShowNewSheet(false)}>
+              <X size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Blank option */}
+          <TouchableOpacity
+            onPress={() => { setShowNewSheet(false); router.push('/notes/editor'); }}
+            style={[styles.newOption, { backgroundColor: colors.bg, borderColor: colors.border }]}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.newOptionIcon, { backgroundColor: colors.primaryLight }]}>
+              <FileText size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>Blank Note</Text>
+              <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>Start with an empty page</Text>
+            </View>
+          </TouchableOpacity>
+
+          <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7, color: colors.textTertiary, marginTop: 16, marginBottom: 10 }}>
+            Templates
+          </Text>
+
+          {NOTE_TEMPLATES.map(t => (
+            <TouchableOpacity
+              key={t.key}
+              onPress={() => {
+                setShowNewSheet(false);
+                router.push({ pathname: '/notes/editor', params: { template: t.key } });
+              }}
+              style={[styles.newOption, { backgroundColor: colors.bg, borderColor: colors.border }]}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.newOptionIcon, { backgroundColor: colors.card }]}>
+                <Text style={{ fontSize: 22 }}>{t.emoji}</Text>
+              </View>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{t.label}</Text>
+            </TouchableOpacity>
+          ))}
+
+          <View style={{ height: 20 }} />
+        </View>
+      </Modal>
 
       {/* New Notebook Modal */}
       <Modal visible={nbModal} transparent animationType="fade" onRequestClose={() => setNbModal(false)}>
@@ -448,6 +535,21 @@ const styles = StyleSheet.create({
     shadowColor: '#7c3aed',
     shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 8,
   },
+
+  // New note sheet
+  newSheet: {
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderWidth: 0.5, borderBottomWidth: 0,
+    paddingHorizontal: 20, paddingTop: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 16,
+  },
+  sheetHandle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  newOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 16, borderWidth: 0.5, padding: 14, marginBottom: 8,
+  },
+  newOptionIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 
   // Modal
   modalOverlay: {

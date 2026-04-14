@@ -11,6 +11,8 @@ import { useUser, useClerk } from '@clerk/clerk-expo';
 import { useAuthStore }    from '../../store/auth';
 import { GraduationCap }   from 'lucide-react-native';
 import { useCanvasStore }  from '../../store/canvas';
+import { useTeamsStore }   from '../../store/teams';
+import { ACCENT_COLORS }   from '../../store/settings';
 import { useNotesStore }   from '../../store/notes';
 import { useTasksStore }   from '../../store/tasks';
 import { useFocusStore }   from '../../store/focus';
@@ -19,6 +21,7 @@ import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { initials, showAlert } from '../../utils/helpers';
+import { requestPermission, fireTestNotification } from '../../lib/notifications';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -30,7 +33,8 @@ export default function SettingsScreen() {
   const { notes }                            = useNotesStore();
   const { tasks }                            = useTasksStore();
   const { sessions, totalFocusMinutes }      = useFocusStore();
-  const { darkMode, toggleDarkMode, notificationsEnabled, setNotificationsEnabled } = useSettingsStore();
+  const { darkMode, toggleDarkMode, notificationsEnabled, setNotificationsEnabled, accentColor, setAccentColor } = useSettingsStore();
+  const { connected: teamsConnected } = useTeamsStore();
 
   const focusHrs    = Math.round(totalFocusMinutes / 60 * 10) / 10;
   const pendingTasks = tasks.filter(t => t.status !== 'done').length;
@@ -105,7 +109,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={[styles.badge, { backgroundColor: colors.bg }]}>
                   <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary }}>
-                    Bellevue College
+                    {appData.school || 'My School'}
                   </Text>
                 </View>
                 {canvasConnected && (
@@ -157,6 +161,12 @@ export default function SettingsScreen() {
               onPress={() => router.push('/canvas')}
             />
             <Row
+              icon={Link2} iconColor="#5865f2"
+              label="Microsoft Teams"
+              value={teamsConnected ? 'Connected' : 'Not connected'}
+              onPress={() => router.push('/teams')}
+            />
+            <Row
               icon={Bot} iconColor="#8b5cf6"
               label="Claude AI"
               value="Active"
@@ -179,17 +189,58 @@ export default function SettingsScreen() {
                 />
               }
             />
+
+            {/* Theme color picker */}
+            <View style={[styles.row, { borderBottomColor: colors.border }, styles.rowBorder]}>
+              <View style={[styles.rowIcon, { backgroundColor: accentColor + '22' }]}>
+                <View style={{ width: 17, height: 17, borderRadius: 9, backgroundColor: accentColor }} />
+              </View>
+              <Text style={[styles.rowLabel, { color: colors.text }]}>Theme Color</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 }}>
+                {ACCENT_COLORS.map(c => (
+                  <TouchableOpacity
+                    key={c.value}
+                    onPress={() => setAccentColor(c.value)}
+                    style={{
+                      width: 26, height: 26, borderRadius: 13,
+                      backgroundColor: c.value,
+                      borderWidth: accentColor === c.value ? 3 : 0,
+                      borderColor: '#fff',
+                      ...(Platform.OS === 'web' ? { boxShadow: accentColor === c.value ? `0 0 0 2px ${c.value}` : 'none' } as any : {}),
+                    }}
+                  />
+                ))}
+              </View>
+            </View>
+
             <Row
               icon={Bell}
               iconColor="#f59e0b"
               label="Notifications"
               right={
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor="#fff"
-                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  {notificationsEnabled && Platform.OS === 'web' && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const perm = await requestPermission();
+                        if (perm === 'granted') {
+                          fireTestNotification();
+                        } else {
+                          showAlert('Permission Required', 'Please allow notifications in your browser settings.');
+                        }
+                      }}
+                      style={[styles.testBtn, { backgroundColor: '#f59e0b18', borderColor: '#f59e0b44' }]}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#f59e0b' }}>Test</Text>
+                    </TouchableOpacity>
+                  )}
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor="#fff"
+                  />
+                </View>
               }
               last
             />
@@ -273,6 +324,10 @@ const styles = StyleSheet.create({
   rowLabel:  { flex: 1, fontSize: 15 },
   valuePill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, marginRight: 4 },
 
+  testBtn: {
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 8, borderWidth: 1,
+  },
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, borderWidth: 1, borderRadius: 16, padding: 15, marginBottom: 16,

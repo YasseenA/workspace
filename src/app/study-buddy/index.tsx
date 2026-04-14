@@ -11,8 +11,10 @@ import { useColors } from '../../lib/theme';
 import { claude } from '../../lib/claude';
 import { useStudyBuddyStore } from '../../store/studyBuddy';
 import { useCanvasStore } from '../../store/canvas';
+import { useTeamsStore } from '../../store/teams';
 import { useTasksStore } from '../../store/tasks';
 import { useNotesStore } from '../../store/notes';
+import { useAuthStore } from '../../store/auth';
 import { initials } from '../../utils/helpers';
 import TopBar from '../../components/layout/TopBar';
 
@@ -45,18 +47,33 @@ function ThinkingDots({ color }: { color: string }) {
 function buildSystemPrompt(
   courses: any[],
   assignments: any[],
+  teamsAssignments: any[],
   tasks: any[],
   notes: any[],
-  userName: string
+  submissions: any[],
+  userName: string,
+  school: string = 'your school'
 ): string {
   const now = new Date();
   const twoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const upcomingAssignments = assignments
+
+  // Canvas upcoming
+  const upcomingCanvas = assignments
     .filter(a => a.due_at && new Date(a.due_at) > now && new Date(a.due_at) <= twoWeeks)
     .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
-    .slice(0, 8)
-    .map(a => `- ${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})`)
+    .slice(0, 6)
+    .map(a => `- [Canvas] ${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})`)
     .join('\n');
+
+  // Teams upcoming
+  const upcomingTeams = teamsAssignments
+    .filter(a => a.dueDateTime && new Date(a.dueDateTime) > now && new Date(a.dueDateTime) <= twoWeeks)
+    .sort((a, b) => new Date(a.dueDateTime!).getTime() - new Date(b.dueDateTime!).getTime())
+    .slice(0, 6)
+    .map(a => `- [Teams/${a.className}] ${a.displayName} (due ${new Date(a.dueDateTime!).toLocaleDateString()})`)
+    .join('\n');
+
+  const upcomingAll = [upcomingCanvas, upcomingTeams].filter(Boolean).join('\n');
 
   const pendingTasks = tasks
     .filter(t => t.status !== 'done')
@@ -69,16 +86,31 @@ function buildSystemPrompt(
     .map(n => `- ${n.title}: ${n.content?.slice(0, 100) || '(no content)'}`)
     .join('\n');
 
-  const coursesList = courses.map(c => c.name).join(', ') || 'No courses connected';
+  const coursesList = courses.map(c => c.name).join(', ') || 'No Canvas courses';
+  const teamsCourseList = [...new Set(teamsAssignments.map((a: any) => a.className))].join(', ');
 
-  return `You are a friendly, knowledgeable Study Buddy for ${userName}, a student at Bellevue College. You help with homework, studying, questions about their courses, time management, and anything academic.
+  // Grade summary (graded Canvas submissions)
+  const subMap = new Map(submissions.map((s: any) => [s.assignment_id, s]));
+  const gradeSummary = courses
+    .map(c => {
+      const enroll = c.enrollments?.[0];
+      const score  = enroll?.computed_current_score;
+      return score != null ? `${c.course_code}: ${Math.round(score)}%` : null;
+    })
+    .filter(Boolean)
+    .slice(0, 6)
+    .join(', ');
+
+  return `You are a friendly, knowledgeable Study Buddy for ${userName}, a student at ${school}. You help with homework, studying, questions about their courses, time management, and anything academic.
 
 Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
 
 Student context:
-Enrolled courses: ${coursesList}
+Canvas courses: ${coursesList}
+${teamsCourseList ? `Teams classes: ${teamsCourseList}` : ''}
+${gradeSummary ? `Current grades: ${gradeSummary}` : ''}
 
-${upcomingAssignments ? `Assignments due in the next 2 weeks:\n${upcomingAssignments}` : 'No assignments due in the next 2 weeks.'}
+${upcomingAll ? `Assignments due in the next 2 weeks:\n${upcomingAll}` : 'No assignments due in the next 2 weeks.'}
 
 ${pendingTasks ? `Pending tasks:\n${pendingTasks}` : 'No pending tasks.'}
 
@@ -99,9 +131,11 @@ export default function StudyBuddyScreen() {
   const { user } = useUser();
 
   const { messages, addMessage, appendToLast, clearHistory } = useStudyBuddyStore();
-  const { courses, assignments } = useCanvasStore();
+  const { courses, assignments, submissions } = useCanvasStore();
+  const { assignments: teamsAssignments } = useTeamsStore();
   const { tasks } = useTasksStore();
   const { notes } = useNotesStore();
+  const { appData } = useAuthStore();
 
   const [input,   setInput]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -109,6 +143,7 @@ export default function StudyBuddyScreen() {
   const scroll = () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
 
   const userName = user?.firstName || user?.fullName?.split(' ')[0] || 'Student';
+  const schoolName = appData.school || 'your school';
   const accentColor = '#7c3aed';
 
   // Scroll to bottom when messages change
@@ -127,7 +162,7 @@ export default function StudyBuddyScreen() {
     scroll();
 
     try {
-      const system = buildSystemPrompt(courses, assignments, tasks, notes, userName);
+      const system = buildSystemPrompt(courses, assignments, teamsAssignments, tasks, notes, submissions, userName, schoolName);
       // Build history from all messages except the empty placeholder we just added
       const history = [...messages, { role: 'user' as const, text }].map(m => ({
         role: m.role as 'user' | 'assistant',
@@ -139,9 +174,9 @@ export default function StudyBuddyScreen() {
         scroll();
       });
     } catch (e: any) {
-      appendToLast(e.message?.includes('fetch')
-        ? 'Proxy unreachable — run: node canvas-proxy.js'
-        : e.message || 'Something went wrong.'
+      appendToLast(e.message?.includes('fetch') || e.message?.includes('Failed to fetch')
+        ? 'AI service temporarily unavailable. Please try again in a moment.'
+        : e.message || 'Something went wrong. Please try again.'
       );
     } finally {
       setLoading(false);

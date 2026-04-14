@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link2, RefreshCw, CheckCircle, BookOpen, X, Download, ExternalLink, AlertCircle } from 'lucide-react-native';
@@ -11,12 +11,16 @@ import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { fmt } from '../../utils/helpers';
 import WebViewer from '../../components/ui/WebViewer';
+import AssignmentDetailSheet, { SheetItem } from '../../components/AssignmentDetailSheet';
 
 export default function CanvasScreen() {
   const colors = useColors();
-  const { connected, icalUrl, courses, assignments, lastSync, isSyncing, error, connect, connectICal, disconnect, sync } = useCanvasStore();
+  const { connected, icalUrl, courses, assignments, submissions, lastSync, isSyncing, error, connect, connectICal, disconnect, sync } = useCanvasStore();
   const { importFromCanvas, tasks } = useTasksStore();
   const { appData } = useAuthStore();
+  const [sheetItem, setSheetItem] = useState<SheetItem | null>(null);
+  const courseMap = useMemo(() => new Map(courses.map(c => [c.id, c])), [courses]);
+  const subMap    = useMemo(() => new Map(submissions.map(s => [s.assignment_id, s])), [submissions]);
   const schoolName = appData.school || 'Your School';
   const canvasSettingsUrl = appData.canvasBaseUrl ? appData.canvasBaseUrl + '/profile/settings' : '#';
   const [showModal, setShowModal] = useState(false);
@@ -234,31 +238,38 @@ export default function CanvasScreen() {
                   const imported = tasks.some(t => t.canvasId === String(a.id));
                   const isUrgent = a.due_at && (new Date(a.due_at).getTime() - now.getTime()) < 2 * 86400000;
                   return (
-                    <View key={a.id} style={[styles.assignCard, { backgroundColor: colors.card, borderColor: isUrgent ? colors.error + '60' : colors.border }]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }} numberOfLines={1}>{a.name}</Text>
-                        {course && (
-                          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                            {course.course_code} · {a.points_possible} pts
-                          </Text>
-                        )}
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, alignItems: 'center' }}>
-                          {due && <Text style={{ fontSize: 12, fontWeight: '600', color: due.color }}>{due.label}</Text>}
-                          {imported && <Badge variant="success" size="sm">Imported</Badge>}
-                          {isUrgent && !imported && <Badge variant="error" size="sm">Due soon!</Badge>}
+                    <TouchableOpacity
+                      key={a.id}
+                      onPress={() => setSheetItem({ kind: 'canvas', data: a, course: courseMap.get(a.course_id), submission: subMap.get(a.id) })}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.assignCard, { backgroundColor: colors.card, borderColor: isUrgent ? colors.error + '60' : colors.border }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }} numberOfLines={1}>{a.name}</Text>
+                          {course && (
+                            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                              {course.course_code} · {a.points_possible} pts
+                            </Text>
+                          )}
+                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, alignItems: 'center' }}>
+                            {due && <Text style={{ fontSize: 12, fontWeight: '600', color: due.color }}>{due.label}</Text>}
+                            {imported && <Badge variant="success" size="sm">Imported</Badge>}
+                            {isUrgent && !imported && <Badge variant="error" size="sm">Due soon!</Badge>}
+                          </View>
                         </View>
+                        {a.html_url && (
+                          <TouchableOpacity
+                            onPress={(e) => {
+                              e.stopPropagation?.();
+                              if (Platform.OS === 'web') { setViewerTitle(a.name); setViewerUrl(a.html_url); }
+                              else window.open?.(a.html_url, '_blank');
+                            }}
+                            style={[styles.viewBtn, { backgroundColor: colors.primaryLight }]}>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>View</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      {a.html_url && (
-                        <TouchableOpacity
-                          onPress={() => {
-                            if (Platform.OS === 'web') { setViewerTitle(a.name); setViewerUrl(a.html_url); }
-                            else window.open?.(a.html_url, '_blank');
-                          }}
-                          style={[styles.viewBtn, { backgroundColor: colors.primaryLight }]}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>View</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
                 {upcoming.length === 0 && (
@@ -338,6 +349,11 @@ export default function CanvasScreen() {
           </>
         )}
       </ScrollView>
+
+      <AssignmentDetailSheet
+        item={sheetItem}
+        onClose={() => setSheetItem(null)}
+      />
 
       <TabBar />
 

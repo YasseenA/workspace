@@ -8,22 +8,23 @@ import { useRouter } from 'expo-router';
 import {
   FileText, CheckSquare, Zap, Timer,
   Plus, ChevronRight, Clock, BookOpen,
-  Calendar, ArrowRight, MessageCircle, RefreshCw, Search, Mail,
+  Calendar, ArrowRight, MessageCircle, RefreshCw, Search, Mail, X,
 } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
 import { useTasksStore } from '../../store/tasks';
 import { useFocusStore } from '../../store/focus';
 import { useCanvasStore } from '../../store/canvas';
+import { useTeamsStore } from '../../store/teams';
 import { useAuthStore } from '../../store/auth';
 import { useSettingsStore } from '../../store/settings';
-import { requestPermission, notifyDueSoon } from '../../lib/notifications';
+import { requestPermission, notifyDueSoon, notifyOverdue } from '../../lib/notifications';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
-import CanvasTutorial from '../../components/CanvasTutorial';
 import { useColors } from '../../lib/theme';
 import { claude } from '../../lib/claude';
 import { fmt, priorityColor, initials } from '../../utils/helpers';
+import AssignmentDetailSheet, { SheetItem } from '../../components/AssignmentDetailSheet';
 
 const BRIEF_CACHE_KEY = 'home_daily_brief';
 const BRIEF_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -49,18 +50,24 @@ export default function HomeScreen() {
   const colors = useColors();
   const { user } = useUser();
   const { notes } = useNotesStore();
-  const { tasks } = useTasksStore();
+  const { tasks, completeTask } = useTasksStore();
   const { totalFocusMinutes } = useFocusStore();
-  const { assignments, courses, connected: canvasConnected } = useCanvasStore();
+  const { assignments, courses, submissions, connected: canvasConnected } = useCanvasStore();
+  const { assignments: teamsAssignments } = useTeamsStore();
   const { hasOnboarded } = useAuthStore();
   const { notificationsEnabled } = useSettingsStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [showCanvasTutorial, setShowCanvasTutorial] = useState(false);
-
-  // Show Canvas tutorial once after onboarding if not connected
+  const [sheetItem, setSheetItem] = useState<SheetItem | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installDismissed, setInstallDismissed] = useState(() => {
+    try { return typeof localStorage !== 'undefined' && localStorage.getItem('pwa_install_dismissed') === '1'; }
+    catch { return false; }
+  });
+  const subMap    = React.useMemo(() => new Map(submissions.map(s => [s.assignment_id, s])), [submissions]);
+  // Navigate to Canvas with tour guide if not connected after onboarding
   useEffect(() => {
     if (hasOnboarded && !canvasConnected) {
-      const timer = setTimeout(() => setShowCanvasTutorial(true), 1200);
+      const timer = setTimeout(() => router.push('/canvas?tour=1'), 1400);
       return () => clearTimeout(timer);
     }
   }, [hasOnboarded, canvasConnected]);
@@ -116,6 +123,14 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+      window.addEventListener('beforeinstallprompt', handler);
+      return () => window.removeEventListener('beforeinstallprompt', handler);
+    }
+  }, []);
+
+  useEffect(() => {
     if (briefStarted.current) return;
     briefStarted.current = true;
     loadBrief();
@@ -127,12 +142,28 @@ export default function HomeScreen() {
         const items = [
           ...assignments
             .filter(a => a.due_at)
-            .map(a => ({ id: `canvas-${a.id}`, title: a.name, dueAt: new Date(a.due_at!), kind: 'assignment' as const })),
+            .map(a => ({
+              id: `canvas-${a.id}`,
+              title: a.name,
+              dueAt: new Date(a.due_at!),
+              kind: 'assignment' as const,
+              courseName: courses.find(c => c.id === a.course_id)?.name,
+            })),
+          ...teamsAssignments
+            .filter(a => a.dueDateTime)
+            .map(a => ({
+              id: `teams-${a.id}`,
+              title: a.displayName,
+              dueAt: new Date(a.dueDateTime!),
+              kind: 'teams' as const,
+              courseName: a.className,
+            })),
           ...tasks
             .filter(t => t.status !== 'done' && t.dueDate)
             .map(t => ({ id: `task-${t.id}`, title: t.title, dueAt: new Date(t.dueDate!), kind: 'task' as const })),
         ];
         notifyDueSoon(items);
+        notifyOverdue(items);
       });
     }
   }, []);
@@ -203,20 +234,12 @@ export default function HomeScreen() {
               <Text style={styles.heroName}>{firstName} 👋</Text>
               <Text style={styles.heroDate}>{dateLabel}</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => router.push('/search')}
-                style={[styles.heroAvatar, { backgroundColor: 'rgba(255,255,255,0.18)' }]}
-              >
-                <Search size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push('/settings')}
-                style={styles.heroAvatar}
-              >
-                <Text style={styles.heroAvatarText}>{initials(user?.fullName || user?.firstName || 'S')}</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              onPress={() => router.push('/search')}
+              style={[styles.heroAvatar, { backgroundColor: 'rgba(255,255,255,0.18)' }]}
+            >
+              <Search size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
 
           {/* Mini stats inside hero */}
@@ -246,6 +269,36 @@ export default function HomeScreen() {
             </Text>
             <ArrowRight size={14} color={colors.error} />
           </TouchableOpacity>
+        )}
+
+        {/* ── PWA install banner ── */}
+        {Platform.OS === 'web' && installPrompt && !installDismissed && (
+          <View style={[styles.installBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={{ fontSize: 20 }}>📲</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '700', color: colors.text }]}>Install Workspace</Text>
+              <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }]}>Add to your home screen for quick access</Text>
+            </View>
+            <TouchableOpacity
+              onPress={async () => {
+                installPrompt.prompt();
+                const { outcome } = await installPrompt.userChoice;
+                if (outcome === 'accepted') setInstallPrompt(null);
+              }}
+              style={[styles.installBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>Install</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setInstallDismissed(true);
+                try { localStorage.setItem('pwa_install_dismissed', '1'); } catch {}
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <X size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* ── Quick actions ── */}
@@ -315,7 +368,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.push('/planner' as any)}
+            onPress={() => router.push('/calendar' as any)}
             style={[styles.buddyCard, { flex: 1, borderColor: '#10b98130', marginBottom: 10 }]}
             activeOpacity={0.85}
           >
@@ -327,8 +380,8 @@ export default function HomeScreen() {
               <Calendar size={18} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.buddyTitle, { color: colors.text }]}>Planner</Text>
-              <Text style={[styles.buddySub, { color: colors.textTertiary }]}>Weekly study schedule</Text>
+              <Text style={[styles.buddyTitle, { color: colors.text }]}>Calendar</Text>
+              <Text style={[styles.buddySub, { color: colors.textTertiary }]}>Deadlines at a glance</Text>
             </View>
             <ChevronRight size={16} color="#10b981" />
           </TouchableOpacity>
@@ -383,7 +436,11 @@ export default function HomeScreen() {
         ) : (
           <>
             {dueTodayTasks.slice(0, 3).map(task => (
-              <TouchableOpacity key={task.id} onPress={() => router.push('/tasks')} activeOpacity={0.7}>
+              <TouchableOpacity
+                key={task.id}
+                onPress={() => setSheetItem({ kind: 'task', data: task })}
+                activeOpacity={0.7}
+              >
                 <View style={[styles.taskCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={[styles.priorityBar, { backgroundColor: priorityColor(task.priority) }]} />
                   <View style={{ flex: 1, paddingLeft: 12 }}>
@@ -399,16 +456,22 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
             {canvasDueToday.map(a => (
-              <View key={a.id} style={[styles.taskCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={[styles.priorityBar, { backgroundColor: '#f59e0b' }]} />
-                <View style={{ flex: 1, paddingLeft: 12 }}>
-                  <Text style={[styles.taskTitle, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>
-                  <Text style={[styles.taskMeta, { color: colors.textSecondary }]}>
-                    {courseMap.get(a.course_id)?.course_code || 'Canvas'} · Due today
-                  </Text>
+              <TouchableOpacity
+                key={a.id}
+                onPress={() => setSheetItem({ kind: 'canvas', data: a, course: courseMap.get(a.course_id), submission: subMap.get(a.id) })}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.taskCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={[styles.priorityBar, { backgroundColor: '#10b981' }]} />
+                  <View style={{ flex: 1, paddingLeft: 12 }}>
+                    <Text style={[styles.taskTitle, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>
+                    <Text style={[styles.taskMeta, { color: colors.textSecondary }]}>
+                      {courseMap.get(a.course_id)?.course_code || 'Canvas'} · Due today
+                    </Text>
+                  </View>
+                  <ChevronRight size={14} color={colors.textTertiary} />
                 </View>
-                <BookOpen size={14} color={colors.textTertiary} />
-              </View>
+              </TouchableOpacity>
             ))}
           </>
         )}
@@ -421,8 +484,8 @@ export default function HomeScreen() {
                 <Calendar size={15} color={colors.primary} />
                 <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Next 7 Days</Text>
               </View>
-              <TouchableOpacity onPress={() => router.push('/canvas')} style={styles.seeAll}>
-                <Text style={[styles.seeAllText, { color: colors.primary }]}>Canvas</Text>
+              <TouchableOpacity onPress={() => router.push('/calendar')} style={styles.seeAll}>
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>Calendar</Text>
                 <ChevronRight size={14} color={colors.primary} />
               </TouchableOpacity>
             </View>
@@ -431,19 +494,26 @@ export default function HomeScreen() {
               const label    = a.due_at ? dayLabel(a.due_at) : '';
               const isUrgent = a.due_at && (new Date(a.due_at).getTime() - now.getTime()) < 2 * 86400000;
               return (
-                <View key={a.id} style={[styles.scheduleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={[styles.dateChip, { backgroundColor: isUrgent ? '#f59e0b18' : colors.primaryLight }]}>
-                    <Text style={[styles.dateChipText, { color: isUrgent ? '#f59e0b' : colors.primary }]}>{label}</Text>
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={() => setSheetItem({ kind: 'canvas', data: a, course, submission: subMap.get(a.id) })}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.scheduleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={[styles.dateChip, { backgroundColor: isUrgent ? '#f59e0b18' : colors.primaryLight }]}>
+                      <Text style={[styles.dateChipText, { color: isUrgent ? '#f59e0b' : colors.primary }]}>{label}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.taskTitle, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>
+                      {course && (
+                        <Text style={[styles.taskMeta, { color: colors.textSecondary }]}>
+                          {course.course_code} · {a.points_possible} pts
+                        </Text>
+                      )}
+                    </View>
+                    <ChevronRight size={14} color={colors.textTertiary} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.taskTitle, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>
-                    {course && (
-                      <Text style={[styles.taskMeta, { color: colors.textSecondary }]}>
-                        {course.course_code} · {a.points_possible} pts
-                      </Text>
-                    )}
-                  </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </>
@@ -557,6 +627,12 @@ export default function HomeScreen() {
         <View style={{ height: 110 }} />
       </ScrollView>
 
+      <AssignmentDetailSheet
+        item={sheetItem}
+        onClose={() => setSheetItem(null)}
+        onCompleteTask={(id) => { completeTask(id); setSheetItem(null); }}
+      />
+
       <TabBar />
 
       {/* FAB */}
@@ -568,10 +644,6 @@ export default function HomeScreen() {
         <Plus size={24} color="#fff" strokeWidth={2.5} />
       </TouchableOpacity>
 
-      <CanvasTutorial
-        visible={showCanvasTutorial}
-        onDismiss={() => setShowCanvasTutorial(false)}
-      />
     </SafeAreaView>
   );
 }
@@ -691,6 +763,17 @@ const styles = StyleSheet.create({
   briefIcon:   { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   briefTitle:  { fontSize: 13, fontWeight: '700' },
   briefBody:   { fontSize: 13, lineHeight: 21 },
+
+  /* Install banner */
+  installBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 16, marginBottom: 10,
+    borderRadius: 16, borderWidth: 0.5, padding: 12,
+  },
+  installBtn: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 10, flexShrink: 0,
+  },
 
   /* FAB */
   fab: {

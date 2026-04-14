@@ -16,7 +16,7 @@ export const SCHOOLS: School[] = [
   { name: 'Central Washington University',     shortName: 'CWU',          canvasUrl: 'https://canvas.cwu.edu',                   location: 'Ellensburg, WA',   emoji: '🦅' },
   { name: 'Eastern Washington University',     shortName: 'EWU',          canvasUrl: 'https://canvas.ewu.edu',                   location: 'Cheney, WA',       emoji: '🦅' },
   { name: 'Seattle University',                shortName: 'Seattle U',    canvasUrl: 'https://canvas.seattleu.edu',              location: 'Seattle, WA',      emoji: '⚓' },
-  { name: 'Bellevue College',                  shortName: 'BC',           canvasUrl: 'https://canvas.bellevuecollege.edu',       location: 'Bellevue, WA',     emoji: '🏫' },
+  { name: 'Bellevue College',                  shortName: 'BC',           canvasUrl: 'https://bc.instructure.com',               location: 'Bellevue, WA',     emoji: '🏫' },
   { name: 'Seattle Central College',           shortName: 'SCC',          canvasUrl: 'https://seattlecentral.instructure.com',   location: 'Seattle, WA',      emoji: '🏫' },
   { name: 'North Seattle College',             shortName: 'NSC',          canvasUrl: 'https://northseattle.instructure.com',     location: 'Seattle, WA',      emoji: '🏫' },
   { name: 'South Seattle College',             shortName: 'SSC',          canvasUrl: 'https://southseattle.instructure.com',     location: 'Seattle, WA',      emoji: '🏫' },

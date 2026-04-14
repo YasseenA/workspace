@@ -116,12 +116,17 @@ function stripHtmlTags(html: string): string {
 export default function NoteEditorScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, template: templateParam } = useLocalSearchParams<{ id?: string; template?: string }>();
   const { notes, notebooks, createNote, updateNote, togglePin, toggleFavorite } = useNotesStore();
   const existingNote = id ? notes.find(n => n.id === id) : null;
 
-  const [title,      setTitle]      = useState(existingNote?.title   || '');
-  const [content,    setContent]    = useState(existingNote?.content || '');
+  // If a template param was passed, find it and pre-apply
+  const presetTemplate = templateParam
+    ? TEMPLATES.find(t => t.label === templateParam) ?? null
+    : null;
+
+  const [title,      setTitle]      = useState(presetTemplate?.title || existingNote?.title   || '');
+  const [content,    setContent]    = useState(presetTemplate?.md    || existingNote?.content || '');
   const [tags,       setTags]       = useState<string[]>(existingNote?.tags  || []);
   const [tagInput,   setTagInput]   = useState('');
   const [notebookId, setNotebookId] = useState<string>(existingNote?.notebookId || '');
@@ -137,8 +142,11 @@ export default function NoteEditorScreen() {
   const [aiLoading,  setAiLoading]  = useState(false);
   const [askInput,   setAskInput]   = useState('');
 
-  // Templates
-  const [showTemplates, setShowTemplates] = useState(!id && !existingNote);
+  // Templates — hide picker if a template was pre-applied via param
+  const [showTemplates, setShowTemplates] = useState(!id && !existingNote && !presetTemplate);
+
+  // presetApplied ref — used after IS_WEB / contentRef are defined below
+  const presetApplied = useRef(false);
 
   // Drawing
   const [drawColor,      setDrawColor]      = useState('#7c3aed');
@@ -163,6 +171,18 @@ export default function NoteEditorScreen() {
     '#10b981','#84cc16','#f59e0b','#f97316','#ef4444','#ec4899','#a78bfa',
   ];
   const IS_WEB = Platform.OS === 'web';
+
+  // ── Apply preset template to web contenteditable ──────────────────────────
+  useEffect(() => {
+    if (!presetTemplate || presetApplied.current || !IS_WEB) return;
+    presetApplied.current = true;
+    setTimeout(() => {
+      if (contentRef.current) {
+        contentRef.current.innerHTML = presetTemplate.html;
+        setContent(presetTemplate.html);
+      }
+    }, 120);
+  }, []);
 
   // ── Initialize contenteditable on web ─────────────────────────────────────
   useEffect(() => {
@@ -510,7 +530,7 @@ ${html}
         chunk => setAiOutput(o => o + chunk)
       );
     } catch (e: any) {
-      setAiOutput('⚠️ ' + (e.message?.includes('fetch') ? 'Proxy unreachable — run: node canvas-proxy.js' : e.message));
+      setAiOutput('⚠️ ' + (e.message?.includes('fetch') || e.message?.includes('Failed to fetch') ? 'AI service temporarily unavailable. Please try again.' : e.message));
     } finally { setAiLoading(false); }
   };
 

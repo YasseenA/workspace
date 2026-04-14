@@ -80,6 +80,12 @@ const server = http.createServer((req, res) => {
 
   const path = req.url || '/';
 
+  if (path === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
   if (path.startsWith('/claude')) {
     const apiPath = '/v1' + path.replace('/claude', '');
     console.log(`[Claude] ${req.method} ${apiPath}`);

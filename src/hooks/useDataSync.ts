@@ -7,6 +7,7 @@ import { useFocusStore }      from '../store/focus';
 import { useSettingsStore }   from '../store/settings';
 import { useStudyBuddyStore } from '../store/studyBuddy';
 import { useCanvasStore }     from '../store/canvas';
+import { useTeamsStore }      from '../store/teams';
 
 // Loads all user data from Supabase when Clerk auth state changes.
 // Call this once in the root layout.
@@ -19,13 +20,13 @@ export function useDataSync() {
   const settingsStore   = useSettingsStore();
   const studyBuddyStore = useStudyBuddyStore();
   const canvasStore     = useCanvasStore();
+  const teamsStore      = useTeamsStore();
 
   useEffect(() => {
     if (!isLoaded) return;
 
     if (user?.id) {
       const uid = user.id;
-      // Load all stores in parallel
       Promise.all([
         authStore.loadForUser(uid),
         notesStore.loadForUser(uid),
@@ -33,13 +34,12 @@ export function useDataSync() {
         focusStore.loadForUser(uid),
         settingsStore.loadForUser(uid),
         studyBuddyStore.loadForUser(uid),
+        teamsStore.loadForUser(uid),
       ]).then(() => {
-        // Load canvas with the token from auth store
         const token = authStore.canvasToken;
         canvasStore.loadForUser(uid, token);
       });
     } else {
-      // Signed out — clear everything
       authStore.resetAppState();
       notesStore.clear();
       tasksStore.clear();
@@ -47,6 +47,7 @@ export function useDataSync() {
       settingsStore.clear();
       studyBuddyStore.clear();
       canvasStore.clear();
+      teamsStore.clear();
     }
   }, [user?.id, isLoaded]);
 }

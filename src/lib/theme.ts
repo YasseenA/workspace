@@ -1,48 +1,52 @@
 import { useSettingsStore } from '../store/settings';
+import { Platform } from 'react-native';
 
-export const lightColors = {
-  primary:       '#7c3aed',   // rich violet
-  primaryDark:   '#6d28d9',
-  primaryLight:  '#ede9fe',
-  accent:        '#f97316',   // orange — warm contrast to violet
-  success:       '#10b981',
-  warning:       '#f59e0b',
-  error:         '#ef4444',
-  info:          '#3b82f6',
-  bg:            '#f7f7fc',   // barely-there violet tint
-  bgSecondary:   '#ffffff',
-  card:          '#ffffff',
-  border:        '#e8e8f2',
-  text:          '#0a0a12',
-  textSecondary: '#4b4b6b',
-  textTertiary:  '#9595b0',
-};
+// Derive light variants from a hex accent color
+function lighten(hex: string, opacity = 0.12): string {
+  return hex + Math.round(opacity * 255).toString(16).padStart(2, '0');
+}
 
-export const darkColors = {
-  primary:       '#a78bfa',
-  primaryDark:   '#7c3aed',
-  primaryLight:  '#1d1535',
-  accent:        '#fb923c',
-  success:       '#34d399',
-  warning:       '#fbbf24',
-  error:         '#f87171',
-  info:          '#60a5fa',
-  bg:            '#0c0c11',   // true dark
-  bgSecondary:   '#111118',
-  card:          '#18181f',
-  border:        '#2a2a38',
-  text:          '#f5f5fa',
-  textSecondary: '#9595b0',
-  textTertiary:  '#65657a',
-};
+function makeColors(accent: string, dark: boolean) {
+  const primaryLight = dark
+    ? lighten(accent, 0.18)
+    : lighten(accent, 0.10);
 
-// Static fallback for StyleSheet.create() outside components
-export const colors = lightColors;
+  return {
+    primary:       accent,
+    primaryDark:   accent,
+    primaryLight,
+    accent:        '#f97316',
+    success:       dark ? '#34d399' : '#10b981',
+    warning:       dark ? '#fbbf24' : '#f59e0b',
+    error:         dark ? '#f87171' : '#ef4444',
+    info:          dark ? '#60a5fa' : '#3b82f6',
+    bg:            dark ? '#0c0c11' : '#f7f7fc',
+    bgSecondary:   dark ? '#111118' : '#ffffff',
+    card:          dark ? '#18181f' : '#ffffff',
+    border:        dark ? '#2a2a38' : '#e8e8f2',
+    text:          dark ? '#f5f5fa' : '#0a0a12',
+    textSecondary: dark ? '#9595b0' : '#4b4b6b',
+    textTertiary:  dark ? '#65657a' : '#9595b0',
+  };
+}
 
-// Hook for inside components — returns reactive colors
+// Static fallback (light + default violet) — used outside components
+export const lightColors = makeColors('#7c3aed', false);
+export const darkColors  = makeColors('#7c3aed', true);
+export const colors      = lightColors;
+
+// Reactive hook — picks up darkMode + accentColor from settings store
 export function useColors() {
-  const darkMode = useSettingsStore(s => s.darkMode);
-  return darkMode ? darkColors : lightColors;
+  const darkMode    = useSettingsStore(s => s.darkMode);
+  const accentColor = useSettingsStore(s => s.accentColor) || '#7c3aed';
+
+  // Apply dark mode to web document body
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.body.style.backgroundColor = darkMode ? '#0c0c11' : '#f7f7fc';
+    document.body.style.color = darkMode ? '#f5f5fa' : '#0a0a12';
+  }
+
+  return makeColors(accentColor, darkMode);
 }
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };

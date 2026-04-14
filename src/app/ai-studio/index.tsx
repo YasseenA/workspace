@@ -163,8 +163,8 @@ export default function AIStudioScreen() {
   };
 
   const errMsg = (e: any) =>
-    e.message?.includes('fetch')
-      ? 'Proxy unreachable. Run: node canvas-proxy.js'
+    e.message?.includes('fetch') || e.message?.includes('Failed to fetch')
+      ? 'AI service temporarily unavailable. Please try again in a moment.'
       : e.message || 'Something went wrong.';
 
   // Push a streaming-capable assistant placeholder and return its index

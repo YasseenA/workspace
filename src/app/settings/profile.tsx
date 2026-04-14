@@ -16,7 +16,8 @@ export default function ProfileScreen() {
   const colors   = useColors();
   const { user } = useUser();
   const { signOut } = useClerk();
-  const { resetAppState } = useAuthStore();
+  const { resetAppState, appData } = useAuthStore();
+  const schoolName = appData.school || 'My School';
 
   const [editing,    setEditing]    = useState(false);
   const [firstName,  setFirstName]  = useState(user?.firstName || '');
@@ -113,7 +114,7 @@ export default function ProfileScreen() {
               <Text style={styles.heroBadgeText}>Free Plan</Text>
             </View>
             <View style={[styles.heroBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-              <Text style={styles.heroBadgeText}>Bellevue College</Text>
+              <Text style={styles.heroBadgeText}>{schoolName}</Text>
             </View>
           </View>
         </View>
@@ -186,7 +187,7 @@ export default function ProfileScreen() {
               <View style={{ gap: 0 }}>
                 <Row icon={User}   iconColor={colors.primary}  label="Display Name"  value={name} />
                 <Row icon={Mail}   iconColor="#10b981"          label="Email"         value={email} />
-                <Row icon={School} iconColor="#f59e0b"          label="School"        value="Bellevue College" last={true} />
+                <Row icon={School} iconColor="#f59e0b"          label="School"        value={schoolName} last={true} />
               </View>
             )}
           </View>
