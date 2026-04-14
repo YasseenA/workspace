@@ -1,35 +1,48 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-const webStorage = {
-  getItem: (name: string) => { try { const v = typeof localStorage !== 'undefined' ? localStorage.getItem(name) : null; return v ? JSON.parse(v) : null; } catch { return null; } },
-  setItem: (name: string, value: string) => { try { if (typeof localStorage !== 'undefined') localStorage.setItem(name, JSON.stringify(value)); } catch {} },
-  removeItem: (name: string) => { try { if (typeof localStorage !== 'undefined') localStorage.removeItem(name); } catch {} },
-};
+import { supabase } from '../lib/supabase';
 
 interface SettingsState {
-  darkMode: boolean;
+  darkMode: boolean; notificationsEnabled: boolean;
+  notifiedIds: string[]; userId: string | null;
+  loadForUser: (userId: string) => Promise<void>;
   toggleDarkMode: () => void;
   setDarkMode: (v: boolean) => void;
-  notificationsEnabled: boolean;
   setNotificationsEnabled: (v: boolean) => void;
-  notifiedIds: string[]; // assignment/task IDs already notified this session
   addNotifiedId: (id: string) => void;
   clearNotifiedIds: () => void;
+  clear: () => void;
 }
 
-export const useSettingsStore = create<SettingsState>()(
-  persist(
-    (set) => ({
-      darkMode: false,
-      toggleDarkMode: () => set(s => ({ darkMode: !s.darkMode })),
-      setDarkMode: (v) => set({ darkMode: v }),
-      notificationsEnabled: true,
-      setNotificationsEnabled: (v) => set({ notificationsEnabled: v }),
-      notifiedIds: [],
-      addNotifiedId: (id) => set(s => ({ notifiedIds: [...s.notifiedIds, id] })),
-      clearNotifiedIds: () => set({ notifiedIds: [] }),
-    }),
-    { name: 'workspace-settings', storage: webStorage }
-  )
-);
+export const useSettingsStore = create<SettingsState>()((set, get) => ({
+  darkMode: false, notificationsEnabled: true, notifiedIds: [], userId: null,
+
+  loadForUser: async (userId) => {
+    set({ userId });
+    const { data } = await supabase.from('profiles')
+      .select('dark_mode,notifications_enabled').eq('user_id', userId).single();
+    if (data) set({ darkMode: data.dark_mode || false, notificationsEnabled: data.notifications_enabled ?? true });
+  },
+
+  toggleDarkMode: () => {
+    const next = !get().darkMode;
+    set({ darkMode: next });
+    const { userId } = get();
+    if (userId) supabase.from('profiles').update({ dark_mode: next }).eq('user_id', userId).then();
+  },
+
+  setDarkMode: (v) => {
+    set({ darkMode: v });
+    const { userId } = get();
+    if (userId) supabase.from('profiles').update({ dark_mode: v }).eq('user_id', userId).then();
+  },
+
+  setNotificationsEnabled: (v) => {
+    set({ notificationsEnabled: v });
+    const { userId } = get();
+    if (userId) supabase.from('profiles').update({ notifications_enabled: v }).eq('user_id', userId).then();
+  },
+
+  addNotifiedId: (id) => set(s => ({ notifiedIds: [...s.notifiedIds, id] })),
+  clearNotifiedIds: () => set({ notifiedIds: [] }),
+  clear: () => set({ darkMode: false, notificationsEnabled: true, notifiedIds: [], userId: null }),
+}));

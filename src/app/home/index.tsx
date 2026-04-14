@@ -15,10 +15,12 @@ import { useNotesStore } from '../../store/notes';
 import { useTasksStore } from '../../store/tasks';
 import { useFocusStore } from '../../store/focus';
 import { useCanvasStore } from '../../store/canvas';
+import { useAuthStore } from '../../store/auth';
 import { useSettingsStore } from '../../store/settings';
 import { requestPermission, notifyDueSoon } from '../../lib/notifications';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
+import CanvasTutorial from '../../components/CanvasTutorial';
 import { useColors } from '../../lib/theme';
 import { claude } from '../../lib/claude';
 import { fmt, priorityColor, initials } from '../../utils/helpers';
@@ -50,8 +52,18 @@ export default function HomeScreen() {
   const { tasks } = useTasksStore();
   const { totalFocusMinutes } = useFocusStore();
   const { assignments, courses, connected: canvasConnected } = useCanvasStore();
+  const { hasOnboarded } = useAuthStore();
   const { notificationsEnabled } = useSettingsStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [showCanvasTutorial, setShowCanvasTutorial] = useState(false);
+
+  // Show Canvas tutorial once after onboarding if not connected
+  useEffect(() => {
+    if (hasOnboarded && !canvasConnected) {
+      const timer = setTimeout(() => setShowCanvasTutorial(true), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [hasOnboarded, canvasConnected]);
 
   const [briefText,    setBriefText]    = useState('');
   const [briefLoading, setBriefLoading] = useState(false);
@@ -555,6 +567,11 @@ export default function HomeScreen() {
       >
         <Plus size={24} color="#fff" strokeWidth={2.5} />
       </TouchableOpacity>
+
+      <CanvasTutorial
+        visible={showCanvasTutorial}
+        onDismiss={() => setShowCanvasTutorial(false)}
+      />
     </SafeAreaView>
   );
 }

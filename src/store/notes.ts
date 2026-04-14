@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '../lib/supabase';
 
 export interface Note {
   id: string; title: string; content: string; excerpt: string;
@@ -12,82 +12,129 @@ export interface Notebook {
 }
 
 interface NotesState {
-  notes: Note[]; notebooks: Notebook[];
+  notes: Note[]; notebooks: Notebook[]; userId: string | null;
+  setUserId: (id: string) => void;
+  loadForUser: (userId: string) => Promise<void>;
   createNote: (data: Partial<Note>) => Note;
   updateNote: (id: string, data: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   togglePin: (id: string) => void;
   toggleFavorite: (id: string) => void;
   createNotebook: (name: string, color: string) => Notebook;
+  clear: () => void;
 }
 
-const webStorage = {
-  getItem: (name: string) => { try { const v = typeof localStorage !== 'undefined' ? localStorage.getItem(name) : null; return v ? JSON.parse(v) : null; } catch { return null; } },
-  setItem: (name: string, value: string) => { try { if (typeof localStorage !== 'undefined') localStorage.setItem(name, JSON.stringify(value)); } catch {} },
-  removeItem: (name: string) => { try { if (typeof localStorage !== 'undefined') localStorage.removeItem(name); } catch {} },
-};
-
-// Strip HTML tags and clean up markdown symbols for plain-text preview
 function toPlainText(raw: string): string {
   return raw
-    .replace(/<[^>]*>/g, ' ')   // strip HTML tags
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\*\*\*(.+?)\*\*\*/g, '$1')  // bold+italic
-    .replace(/\*\*(.+?)\*\*/g, '$1')       // bold
-    .replace(/\*(.+?)\*/g, '$1')           // italic
-    .replace(/~~(.+?)~~/g, '$1')           // strikethrough
-    .replace(/^#{1,6}\s+/gm, '')           // headings
-    .replace(/^[-*]\s+/gm, '')             // bullets
-    .replace(/^\d+\.\s+/gm, '')            // numbered list
-    .replace(/^>\s+/gm, '')                // blockquote
-    .replace(/`([^`]+)`/g, '$1')           // inline code
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/\*\*\*(.+?)\*\*\*/g, '$1').replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1').replace(/~~(.+?)~~/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '').replace(/^[-*]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '').replace(/^>\s+/gm, '')
+    .replace(/`([^`]+)`/g, '$1').replace(/\s+/g, ' ').trim();
 }
 
-// Strip trailing em dashes and trailing punctuation from template titles
 function cleanTitle(t: string): string {
   return t.replace(/\s*[—–-]+\s*$/, '').trim();
 }
 
-export const useNotesStore = create<NotesState>()(
-  persist(
-    (set) => ({
-      notes: [], notebooks: [],
-      createNote: (data) => {
-        const rawTitle = data.title || 'Untitled';
-        const note: Note = {
-          id: 'n' + Date.now(), title: cleanTitle(rawTitle),
-          content: data.content || '', excerpt: toPlainText(data.content || '').slice(0, 120),
-          notebookId: data.notebookId || 'nb1', tags: data.tags || [],
-          isPinned: false, isFavorite: false,
-          wordCount: toPlainText(data.content || '').split(/\s+/).filter(Boolean).length,
-          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        };
-        set(s => ({ notes: [note, ...s.notes] }));
-        return note;
-      },
-      updateNote: (id, data) => set(s => ({
-        notes: s.notes.map(n => n.id === id ? {
-          ...n, ...data,
-          title: data.title !== undefined ? cleanTitle(data.title) : n.title,
-          updatedAt: new Date().toISOString(),
-          excerpt: data.content !== undefined ? toPlainText(data.content).slice(0, 120) : n.excerpt,
-          wordCount: data.content !== undefined ? toPlainText(data.content).split(/\s+/).filter(Boolean).length : n.wordCount,
-        } : n)
-      })),
-      deleteNote: (id) => set(s => ({ notes: s.notes.filter(n => n.id !== id) })),
-      togglePin: (id) => set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, isPinned: !n.isPinned } : n) })),
-      toggleFavorite: (id) => set(s => ({ notes: s.notes.map(n => n.id === id ? { ...n, isFavorite: !n.isFavorite } : n) })),
-      createNotebook: (name, color) => {
-        const nb: Notebook = { id: 'nb' + Date.now(), name, color, icon: '📓', noteCount: 0 };
-        set(s => ({ notebooks: [...s.notebooks, nb] }));
-        return nb;
-      },
-    }),
-    { name: 'workspace-notes', storage: webStorage }
-  )
-);
+// Map DB snake_case → app camelCase
+function fromDB(row: any): Note {
+  return {
+    id: row.id, title: row.title, content: row.content || '',
+    excerpt: row.excerpt || '', notebookId: row.notebook_id || '',
+    tags: row.tags || [], isPinned: row.is_pinned || false,
+    isFavorite: row.is_favorite || false, wordCount: row.word_count || 0,
+    images: row.images || [], createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+function notebookFromDB(row: any): Notebook {
+  return { id: row.id, name: row.name, color: row.color, icon: row.icon || '📓', noteCount: 0 };
+}
+
+export const useNotesStore = create<NotesState>()((set, get) => ({
+  notes: [], notebooks: [], userId: null,
+
+  setUserId: (id) => set({ userId: id }),
+
+  loadForUser: async (userId) => {
+    set({ userId });
+    const [{ data: notes }, { data: nbs }] = await Promise.all([
+      supabase.from('notes').select('*').eq('user_id', userId).order('updated_at', { ascending: false }),
+      supabase.from('notebooks').select('*').eq('user_id', userId),
+    ]);
+    set({ notes: (notes || []).map(fromDB), notebooks: (nbs || []).map(notebookFromDB) });
+  },
+
+  createNote: (data) => {
+    const userId = get().userId;
+    const title = cleanTitle(data.title || 'Untitled');
+    const note: Note = {
+      id: 'n' + Date.now(), title,
+      content: data.content || '', excerpt: toPlainText(data.content || '').slice(0, 120),
+      notebookId: data.notebookId || '', tags: data.tags || [],
+      isPinned: false, isFavorite: false,
+      wordCount: toPlainText(data.content || '').split(/\s+/).filter(Boolean).length,
+      images: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    set(s => ({ notes: [note, ...s.notes] }));
+    if (userId) supabase.from('notes').insert({
+      id: note.id, user_id: userId, title: note.title, content: note.content,
+      excerpt: note.excerpt, notebook_id: note.notebookId || null, tags: note.tags,
+      is_pinned: false, is_favorite: false, word_count: note.wordCount,
+      images: [], created_at: note.createdAt, updated_at: note.updatedAt,
+    }).then();
+    return note;
+  },
+
+  updateNote: (id, data) => {
+    const userId = get().userId;
+    const title = data.title !== undefined ? cleanTitle(data.title) : undefined;
+    set(s => ({
+      notes: s.notes.map(n => n.id === id ? {
+        ...n, ...data,
+        title: title !== undefined ? title : n.title,
+        updatedAt: new Date().toISOString(),
+        excerpt: data.content !== undefined ? toPlainText(data.content).slice(0, 120) : n.excerpt,
+        wordCount: data.content !== undefined ? toPlainText(data.content).split(/\s+/).filter(Boolean).length : n.wordCount,
+      } : n)
+    }));
+    if (userId) {
+      const patch: any = { updated_at: new Date().toISOString() };
+      if (data.title !== undefined)     patch.title       = title;
+      if (data.content !== undefined)   { patch.content = data.content; patch.excerpt = toPlainText(data.content).slice(0, 120); patch.word_count = toPlainText(data.content).split(/\s+/).filter(Boolean).length; }
+      if (data.tags !== undefined)      patch.tags        = data.tags;
+      if (data.notebookId !== undefined)patch.notebook_id = data.notebookId || null;
+      if (data.images !== undefined)    patch.images      = data.images;
+      if (data.isPinned !== undefined)  patch.is_pinned   = data.isPinned;
+      if (data.isFavorite !== undefined)patch.is_favorite = data.isFavorite;
+      supabase.from('notes').update(patch).eq('id', id).eq('user_id', userId).then();
+    }
+  },
+
+  deleteNote: (id) => {
+    const userId = get().userId;
+    set(s => ({ notes: s.notes.filter(n => n.id !== id) }));
+    if (userId) supabase.from('notes').delete().eq('id', id).eq('user_id', userId).then();
+  },
+
+  togglePin: (id) => {
+    const note = get().notes.find(n => n.id === id);
+    if (note) get().updateNote(id, { isPinned: !note.isPinned });
+  },
+
+  toggleFavorite: (id) => {
+    const note = get().notes.find(n => n.id === id);
+    if (note) get().updateNote(id, { isFavorite: !note.isFavorite });
+  },
+
+  createNotebook: (name, color) => {
+    const userId = get().userId;
+    const nb: Notebook = { id: 'nb' + Date.now(), name, color, icon: '📓', noteCount: 0 };
+    set(s => ({ notebooks: [...s.notebooks, nb] }));
+    if (userId) supabase.from('notebooks').insert({ id: nb.id, user_id: userId, name, color, icon: '📓' }).then();
+    return nb;
+  },
+
+  clear: () => set({ notes: [], notebooks: [], userId: null }),
+}));

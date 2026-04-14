@@ -1,7 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '../lib/supabase';
 
-// App-specific user data that Clerk doesn't manage
 interface AppUserData {
   school: string;
   canvasBaseUrl: string;
@@ -13,6 +12,8 @@ interface AuthState {
   appData: AppUserData;
   hasOnboarded: boolean;
   canvasToken: string | null;
+  userId: string | null;
+  loadForUser: (userId: string) => Promise<void>;
   updateAppData: (d: Partial<AppUserData>) => void;
   completeOnboarding: () => void;
   setCanvasToken: (t: string) => void;
@@ -24,40 +25,56 @@ const defaultAppData: AppUserData = {
   canvasBaseUrl: 'https://canvas.bellevuecollege.edu',
 };
 
-const webStorage = {
-  getItem: (name: string) => {
-    try {
-      if (typeof localStorage !== 'undefined') return localStorage.getItem(name);
-      return null;
-    } catch { return null; }
-  },
-  setItem: (name: string, value: string) => {
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem(name, value); } catch {}
-  },
-  removeItem: (name: string) => {
-    try { if (typeof localStorage !== 'undefined') localStorage.removeItem(name); } catch {}
-  },
-};
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  appData: defaultAppData,
+  hasOnboarded: false,
+  canvasToken: null,
+  userId: null,
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      appData: defaultAppData,
-      hasOnboarded: false,
-      canvasToken: null,
+  loadForUser: async (userId) => {
+    set({ userId });
+    const { data, error } = await supabase.from('profiles')
+      .select('school,canvas_base_url,has_onboarded,canvas_token')
+      .eq('user_id', userId).single();
 
-      updateAppData: (d) => set(s => ({ appData: { ...s.appData, ...d } })),
-      completeOnboarding: () => set({ hasOnboarded: true }),
-      setCanvasToken: (t) => set({ canvasToken: t }),
-      resetAppState: () => set({ appData: defaultAppData, hasOnboarded: false, canvasToken: null }),
-    }),
-    {
-      name: 'workspace-app',
-      storage: {
-        getItem: (name) => { const v = webStorage.getItem(name); return v ? JSON.parse(v) : null; },
-        setItem: (name, value) => webStorage.setItem(name, JSON.stringify(value)),
-        removeItem: (name) => webStorage.removeItem(name),
-      },
+    if (error || !data) {
+      // New user — create profile
+      await supabase.from('profiles').insert({ user_id: userId });
+      set({ hasOnboarded: false });
+    } else {
+      set({
+        appData: {
+          school: data.school || defaultAppData.school,
+          canvasBaseUrl: data.canvas_base_url || defaultAppData.canvasBaseUrl,
+        },
+        hasOnboarded: data.has_onboarded || false,
+        canvasToken: data.canvas_token || null,
+      });
     }
-  )
-);
+  },
+
+  updateAppData: (d) => {
+    set(s => ({ appData: { ...s.appData, ...d } }));
+    const { userId } = get();
+    if (userId) {
+      const patch: any = {};
+      if (d.school)         patch.school          = d.school;
+      if (d.canvasBaseUrl)  patch.canvas_base_url = d.canvasBaseUrl;
+      supabase.from('profiles').update(patch).eq('user_id', userId).then();
+    }
+  },
+
+  completeOnboarding: () => {
+    set({ hasOnboarded: true });
+    const { userId } = get();
+    if (userId) supabase.from('profiles').update({ has_onboarded: true }).eq('user_id', userId).then();
+  },
+
+  setCanvasToken: (t) => {
+    set({ canvasToken: t });
+    const { userId } = get();
+    if (userId) supabase.from('profiles').update({ canvas_token: t }).eq('user_id', userId).then();
+  },
+
+  resetAppState: () => set({ appData: defaultAppData, hasOnboarded: false, canvasToken: null, userId: null }),
+}));
