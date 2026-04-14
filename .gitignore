@@ -1,6 +1,6 @@
 node_modules/
 .expo/
-dist/
+# dist/ committed for Vercel static deploy
 .env
 *.orig.*
 .claude/settings.local.json
@@ -10,3 +10,4 @@ dist/
 
 expo-env.d.ts
 # @end expo-cli
+.vercel
