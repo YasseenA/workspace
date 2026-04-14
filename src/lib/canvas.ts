@@ -1,39 +1,21 @@
 import { Platform } from 'react-native';
 
 const CLIENT_ID = process.env.EXPO_PUBLIC_CANVAS_CLIENT_ID || '';
-
-// Read the stored school's Canvas URL at call time (not at import time)
-// so it reflects whatever school the user picked during onboarding.
 const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'http://localhost:3001';
 
+// Set by auth store when user profile loads — avoids reading from localStorage
+let _canvasBase = '';
+export function setCanvasBase(url: string) { _canvasBase = url; }
+
 function getBase(): string {
-  if (Platform.OS === 'web') {
-    // On web we go through the proxy which forwards to the right school.
-    // The proxy reads X-Canvas-Base to know which Canvas instance to forward to.
-    return PROXY;
-  }
-  try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('workspace-app') : null;
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const url = parsed?.state?.appData?.canvasBaseUrl;
-      if (url) return url;
-    }
-  } catch {}
-  return process.env.EXPO_PUBLIC_CANVAS_BASE_URL || 'https://canvas.bellevuecollege.edu';
+  // On web always go through proxy; proxy uses X-Canvas-Base header to forward to correct school
+  if (Platform.OS === 'web') return PROXY;
+  return _canvasBase || '';
 }
 
-// For web proxy: pass target school as a header so the proxy can forward correctly
 function schoolHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  if (Platform.OS !== 'web') return extra;
-  try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('workspace-app') : null;
-    if (raw) {
-      const url = JSON.parse(raw)?.state?.appData?.canvasBaseUrl;
-      if (url) return { ...extra, 'X-Canvas-Base': url };
-    }
-  } catch {}
-  return extra;
+  if (!_canvasBase) return extra;
+  return { ...extra, 'X-Canvas-Base': _canvasBase };
 }
 
 export const canvas = {

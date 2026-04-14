@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { setCanvasBase } from '../lib/canvas';
 
 interface AppUserData {
   school: string;
@@ -21,8 +22,8 @@ interface AuthState {
 }
 
 const defaultAppData: AppUserData = {
-  school: 'Bellevue College',
-  canvasBaseUrl: 'https://canvas.bellevuecollege.edu',
+  school: '',
+  canvasBaseUrl: '',
 };
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
@@ -42,10 +43,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       await supabase.from('profiles').insert({ user_id: userId });
       set({ hasOnboarded: false });
     } else {
+      const canvasBaseUrl = data.canvas_base_url || '';
+      if (canvasBaseUrl) setCanvasBase(canvasBaseUrl);
       set({
         appData: {
-          school: data.school || defaultAppData.school,
-          canvasBaseUrl: data.canvas_base_url || defaultAppData.canvasBaseUrl,
+          school: data.school || '',
+          canvasBaseUrl,
         },
         hasOnboarded: data.has_onboarded || false,
         canvasToken: data.canvas_token || null,
@@ -55,6 +58,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   updateAppData: (d) => {
     set(s => ({ appData: { ...s.appData, ...d } }));
+    if (d.canvasBaseUrl) setCanvasBase(d.canvasBaseUrl);
     const { userId } = get();
     if (userId) {
       const patch: any = {};

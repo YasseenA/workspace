@@ -1,22 +1,24 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { canvas, CanvasCourse, CanvasAssignment, CanvasSubmission } from '../lib/canvas';
+import { fetchAndParseICal } from '../lib/ical';
 
 interface CanvasState {
-  connected: boolean; token: string | null;
+  connected: boolean; token: string | null; icalUrl: string | null;
   courses: CanvasCourse[]; assignments: CanvasAssignment[];
   submissions: CanvasSubmission[];
   lastSync: string | null; isSyncing: boolean; error: string | null;
   userId: string | null;
   loadForUser: (userId: string, token?: string | null) => Promise<void>;
   connect: (token: string) => Promise<void>;
+  connectICal: (feedUrl: string) => Promise<void>;
   disconnect: () => void;
   sync: () => Promise<void>;
   clear: () => void;
 }
 
 export const useCanvasStore = create<CanvasState>()((set, get) => ({
-  connected: false, token: null, courses: [], assignments: [],
+  connected: false, token: null, icalUrl: null, courses: [], assignments: [],
   submissions: [], lastSync: null, isSyncing: false, error: null, userId: null,
 
   loadForUser: async (userId, token) => {
@@ -56,17 +58,37 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
         canvas_last_sync: now,
       }).eq('user_id', userId);
     } catch (e: any) {
-      const msg = e.message?.includes('Failed to fetch')
-        ? 'Could not reach Canvas. Check that your proxy is running.'
-        : e.message || 'Connection failed.';
+      const msg = e.message?.includes('Failed to fetch') || e.message?.includes('fetch')
+        ? 'Could not reach Canvas. Make sure you selected the correct school and that your school\'s Canvas API is enabled.'
+        : e.message || 'Connection failed. Double-check your token and try again.';
       set({ isSyncing: false, error: msg });
       throw new Error(msg);
     }
   },
 
+  connectICal: async (feedUrl) => {
+    const { userId } = get();
+    set({ isSyncing: true, error: null });
+    try {
+      const { assignments, courses } = await fetchAndParseICal(feedUrl);
+      const now = new Date().toISOString();
+      set({ connected: true, icalUrl: feedUrl, token: null, courses, assignments, submissions: [], lastSync: now, isSyncing: false });
+      if (userId) await supabase.from('profiles').update({
+        canvas_token: null,
+        canvas_courses: courses,
+        canvas_assignments: assignments,
+        canvas_submissions: [],
+        canvas_last_sync: now,
+      }).eq('user_id', userId);
+    } catch (e: any) {
+      set({ isSyncing: false, error: e.message || 'Could not connect via calendar feed.' });
+      throw e;
+    }
+  },
+
   disconnect: () => {
     const { userId } = get();
-    set({ connected: false, token: null, courses: [], assignments: [], submissions: [], lastSync: null });
+    set({ connected: false, token: null, icalUrl: null, courses: [], assignments: [], submissions: [], lastSync: null });
     if (userId) supabase.from('profiles').update({
       canvas_token: null, canvas_courses: [], canvas_assignments: [], canvas_submissions: [],
     }).eq('user_id', userId).then();
@@ -90,5 +112,5 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
     } catch (e: any) { set({ isSyncing: false, error: e.message }); throw e; }
   },
 
-  clear: () => set({ connected: false, token: null, courses: [], assignments: [], submissions: [], lastSync: null, isSyncing: false, error: null, userId: null }),
+  clear: () => set({ connected: false, token: null, icalUrl: null, courses: [], assignments: [], submissions: [], lastSync: null, isSyncing: false, error: null, userId: null }),
 }));

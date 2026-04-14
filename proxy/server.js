@@ -80,7 +80,31 @@ const server = http.createServer((req, res) => {
 
   const path = req.url || '/';
 
-  if (path.startsWith('/claude')) {
+  if (path.startsWith('/ical')) {
+    // Fetch any iCal feed URL — used for schools that block personal access tokens
+    const params = new URLSearchParams((path.split('?')[1] || ''));
+    const icalUrl = params.get('url');
+    if (!icalUrl) { res.writeHead(400); res.end('Missing url param'); return; }
+    try {
+      const parsed = new URL(icalUrl);
+      const proto = parsed.protocol === 'https:' ? https : http;
+      const proxyReq = proto.request({
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        method: 'GET',
+        headers: { 'User-Agent': 'Workspace/1.0 Calendar Client' },
+      }, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, {
+          'Content-Type': proxyRes.headers['content-type'] || 'text/calendar',
+          'Access-Control-Allow-Origin': '*',
+        });
+        proxyRes.pipe(res);
+      });
+      proxyReq.on('error', (e) => { res.writeHead(502); res.end(e.message); });
+      proxyReq.end();
+    } catch (e) { res.writeHead(400); res.end('Invalid URL'); }
+    return;
+  } else if (path.startsWith('/claude')) {
     const apiPath = '/v1' + path.replace('/claude', '');
     console.log(`[Claude] ${req.method} ${apiPath}`);
     forwardTo(req, res, CLAUDE_HOST, apiPath);

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link2, RefreshCw, CheckCircle, BookOpen, X, Download, ExternalLink, AlertCircle } from 'lucide-react-native';
 import { useCanvasStore } from '../../store/canvas';
 import { useTasksStore } from '../../store/tasks';
+import { useAuthStore } from '../../store/auth';
 import { Card, Button, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
@@ -13,10 +14,15 @@ import WebViewer from '../../components/ui/WebViewer';
 
 export default function CanvasScreen() {
   const colors = useColors();
-  const { connected, courses, assignments, lastSync, isSyncing, error, connect, disconnect, sync } = useCanvasStore();
+  const { connected, icalUrl, courses, assignments, lastSync, isSyncing, error, connect, connectICal, disconnect, sync } = useCanvasStore();
   const { importFromCanvas, tasks } = useTasksStore();
+  const { appData } = useAuthStore();
+  const schoolName = appData.school || 'Your School';
+  const canvasSettingsUrl = appData.canvasBaseUrl ? appData.canvasBaseUrl + '/profile/settings' : '#';
   const [showModal, setShowModal] = useState(false);
+  const [showICalModal, setShowICalModal] = useState(false);
   const [token, setToken] = useState('');
+  const [icalInput, setICalInput] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState('');
   const [importing, setImporting] = useState(false);
@@ -32,6 +38,17 @@ export default function CanvasScreen() {
       setShowModal(false); setToken('');
     } catch (e: any) {
       setConnectError(e.message || 'Connection failed. Check your token and try again.');
+    } finally { setConnecting(false); }
+  };
+
+  const handleConnectICal = async () => {
+    if (!icalInput.trim()) { setConnectError('Please paste your Canvas calendar feed URL.'); return; }
+    setConnecting(true); setConnectError('');
+    try {
+      await connectICal(icalInput.trim());
+      setShowICalModal(false); setICalInput('');
+    } catch (e: any) {
+      setConnectError(e.message || 'Could not read that calendar feed. Double-check the URL.');
     } finally { setConnecting(false); }
   };
 
@@ -91,7 +108,7 @@ export default function CanvasScreen() {
             <View style={[styles.connectIcon, { backgroundColor: colors.primaryLight }]}>
               <Link2 size={40} color={colors.primary} strokeWidth={1.5} />
             </View>
-            <Text style={[styles.connectTitle, { color: colors.text }]}>Connect Bellevue College Canvas</Text>
+            <Text style={[styles.connectTitle, { color: colors.text }]}>Connect {schoolName} Canvas</Text>
             <Text style={[styles.connectDesc, { color: colors.textSecondary }]}>
               Sync your real assignments, courses, and due dates using your Canvas API token.
             </Text>
@@ -100,7 +117,7 @@ export default function CanvasScreen() {
             <View style={[styles.steps, { backgroundColor: colors.bg, borderColor: colors.border }]}>
               <Text style={[styles.stepsTitle, { color: colors.text }]}>How to get your token:</Text>
               {[
-                'Go to bc.instructure.com',
+                `Go to ${appData.canvasBaseUrl || 'your school Canvas'}`,
                 'Click Account → Settings',
                 'Scroll to "Approved Integrations"',
                 'Click "+ New Access Token"',
@@ -116,7 +133,7 @@ export default function CanvasScreen() {
             </View>
 
             <TouchableOpacity style={styles.canvasLink}
-              onPress={() => { if (Platform.OS === 'web') window.open('https://bc.instructure.com/profile/settings', '_blank'); }}>
+              onPress={() => { if (Platform.OS === 'web') window.open(canvasSettingsUrl, '_blank'); }}>
               <ExternalLink size={14} color={colors.primary} />
               <Text style={[styles.canvasLinkText, { color: colors.primary }]}>Open Canvas Settings</Text>
             </TouchableOpacity>
@@ -124,6 +141,22 @@ export default function CanvasScreen() {
             <Button variant="primary" fullWidth onPress={() => setShowModal(true)} style={{ marginTop: 16 }}>
               Connect with Access Token
             </Button>
+
+            {/* iCal fallback */}
+            <View style={[styles.icalBanner, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                🔒 My school doesn't allow access tokens
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18, marginBottom: 10 }}>
+                Some schools (like UW) restrict API tokens. You can still connect using your Canvas calendar feed — you'll get assignments and due dates, but not grades.
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowICalModal(true)}
+                style={[styles.icalBtn, { borderColor: colors.primary }]}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>Connect with Calendar Feed →</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           /* ── Connected ── */
@@ -132,9 +165,20 @@ export default function CanvasScreen() {
             <View style={[styles.statusBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <CheckCircle size={18} color={colors.success} fill={colors.success + '30'} />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Connected to Bellevue College</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>
+                  Connected to {schoolName}{icalUrl ? ' (Calendar Feed)' : ''}
+                </Text>
                 {lastSync && <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 1 }}>Synced {fmt.relative(lastSync)}</Text>}
+                {icalUrl && <Text style={{ fontSize: 11, color: colors.warning, marginTop: 2 }}>⚠️ Calendar mode — assignments only, no grades</Text>}
               </View>
+              {icalUrl && (
+                <TouchableOpacity
+                  onPress={() => setShowModal(true)}
+                  style={[styles.actionBtn, { backgroundColor: colors.primaryLight }]}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Upgrade →</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={handleDisconnect}>
                 <Text style={{ fontSize: 12, color: colors.error, fontWeight: '600' }}>Disconnect</Text>
               </TouchableOpacity>
@@ -302,6 +346,55 @@ export default function CanvasScreen() {
         <WebViewer url={viewerUrl} title={viewerTitle} onClose={() => { setViewerUrl(null); setViewerTitle(undefined); }} />
       )}
 
+      {/* iCal Modal */}
+      {showICalModal && (
+        <View style={styles.overlay}>
+          <View style={[styles.modal, { backgroundColor: colors.card }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>Calendar Feed</Text>
+              <TouchableOpacity onPress={() => { setShowICalModal(false); setICalInput(''); setConnectError(''); }}>
+                <X size={22} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.icalSteps, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 8 }}>How to find your calendar feed URL:</Text>
+              {[
+                'Open Canvas and sign in to your school account',
+                'Click "Calendar" in the left sidebar',
+                'At the bottom of the page, click the calendar feed icon (📅 or chain link)',
+                'Copy the full URL — it starts with https://',
+                'Paste it below',
+              ].map((s, i) => (
+                <View key={i} style={{ flexDirection: 'row', gap: 10, marginBottom: 6 }}>
+                  <View style={[styles.stepNum, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.stepNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, flex: 1, lineHeight: 18 }}>{s}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={[{ backgroundColor: '#fef3c7', borderRadius: 12, padding: 10, marginTop: 10, marginBottom: 12 }]}>
+              <Text style={{ fontSize: 12, color: '#92400e', lineHeight: 17 }}>
+                ⚠️ Calendar feed gives you assignments and due dates only. Grades and points are not available in this mode.
+              </Text>
+            </View>
+            <TextInput
+              style={[styles.tokenInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.bg }]}
+              placeholder="https://canvas.uw.edu/feeds/calendars/user_..."
+              placeholderTextColor={colors.textTertiary}
+              value={icalInput}
+              onChangeText={setICalInput}
+              autoFocus
+              multiline
+            />
+            {connectError ? <Text style={{ fontSize: 13, color: colors.error, marginTop: 8 }}>{connectError}</Text> : null}
+            <Button variant="primary" fullWidth onPress={handleConnectICal} loading={connecting} style={{ marginTop: 12 }}>
+              {connecting ? 'Connecting...' : 'Connect Calendar Feed'}
+            </Button>
+          </View>
+        </View>
+      )}
+
       {/* Token Modal */}
       {showModal && (
         <View style={styles.overlay}>
@@ -364,4 +457,8 @@ const styles = StyleSheet.create({
   overlay:       { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   modal:         { borderRadius: 24, padding: 24, width: '100%', maxWidth: 480 },
   tokenInput:    { borderWidth: 1, borderRadius: 12, padding: 13, fontSize: 13, minHeight: 80, fontFamily: 'monospace' },
+  icalBanner:    { borderRadius: 16, borderWidth: 1, padding: 14, marginTop: 12 },
+  icalBtn:       { borderWidth: 1.5, borderRadius: 12, padding: 10, alignItems: 'center' },
+  icalSteps:     { borderRadius: 14, borderWidth: 0.5, padding: 14, marginBottom: 4 },
+  actionBtn:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9 },
 });
