@@ -7,7 +7,9 @@
     "web": "expo start --web",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "proxy": "node canvas-proxy.js"
+    "proxy": "node canvas-proxy.js",
+    "build:web": "expo export --platform web",
+    "preview": "npx serve dist"
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.31",

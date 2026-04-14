@@ -9,6 +9,7 @@ import {
 } from 'lucide-react-native';
 import { useUser, useClerk } from '@clerk/clerk-expo';
 import { useAuthStore }    from '../../store/auth';
+import { GraduationCap }   from 'lucide-react-native';
 import { useCanvasStore }  from '../../store/canvas';
 import { useNotesStore }   from '../../store/notes';
 import { useTasksStore }   from '../../store/tasks';
@@ -24,7 +25,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const { user }                             = useUser();
   const { signOut }                          = useClerk();
-  const { resetAppState }                    = useAuthStore();
+  const { resetAppState, appData }           = useAuthStore();
   const { connected: canvasConnected, courses } = useCanvasStore();
   const { notes }                            = useNotesStore();
   const { tasks }                            = useTasksStore();
@@ -143,6 +144,12 @@ export default function SettingsScreen() {
           </Section>
 
           <Section title="INTEGRATIONS">
+            <Row
+              icon={GraduationCap} iconColor="#7c3aed"
+              label="School"
+              value={appData.school || 'Not set'}
+              onPress={() => router.push('/settings/school')}
+            />
             <Row
               icon={Link2} iconColor="#f59e0b"
               label="Canvas LMS"

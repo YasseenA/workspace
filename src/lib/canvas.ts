@@ -1,17 +1,51 @@
 import { Platform } from 'react-native';
-const BASE = Platform.OS === 'web'
-  ? 'http://localhost:3001'
-  : (process.env.EXPO_PUBLIC_CANVAS_BASE_URL || 'https://canvas.bellevuecollege.edu');
+
 const CLIENT_ID = process.env.EXPO_PUBLIC_CANVAS_CLIENT_ID || '';
 
+// Read the stored school's Canvas URL at call time (not at import time)
+// so it reflects whatever school the user picked during onboarding.
+const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'http://localhost:3001';
+
+function getBase(): string {
+  if (Platform.OS === 'web') {
+    // On web we go through the proxy which forwards to the right school.
+    // The proxy reads X-Canvas-Base to know which Canvas instance to forward to.
+    return PROXY;
+  }
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('workspace-app') : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const url = parsed?.state?.appData?.canvasBaseUrl;
+      if (url) return url;
+    }
+  } catch {}
+  return process.env.EXPO_PUBLIC_CANVAS_BASE_URL || 'https://canvas.bellevuecollege.edu';
+}
+
+// For web proxy: pass target school as a header so the proxy can forward correctly
+function schoolHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  if (Platform.OS !== 'web') return extra;
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('workspace-app') : null;
+    if (raw) {
+      const url = JSON.parse(raw)?.state?.appData?.canvasBaseUrl;
+      if (url) return { ...extra, 'X-Canvas-Base': url };
+    }
+  } catch {}
+  return extra;
+}
+
 export const canvas = {
-  getAuthUrl: () =>
-    `${BASE}/login/oauth2/auth?client_id=${CLIENT_ID}&response_type=code&redirect_uri=workspace://canvas/callback&scope=url:GET|/api/v1/courses`,
+  getAuthUrl: () => {
+    const base = getBase();
+    return `${base}/login/oauth2/auth?client_id=${CLIENT_ID}&response_type=code&redirect_uri=workspace://canvas/callback&scope=url:GET|/api/v1/courses`;
+  },
 
   getToken: async (code: string) => {
-    const res = await fetch(`${BASE}/login/oauth2/token`, {
+    const res = await fetch(`${getBase()}/login/oauth2/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...schoolHeaders() },
       body: JSON.stringify({ client_id: CLIENT_ID, grant_type: 'authorization_code', code, redirect_uri: 'workspace://canvas/callback' }),
     });
     if (!res.ok) throw new Error('Canvas auth failed');
@@ -20,21 +54,21 @@ export const canvas = {
 
   getCourses: async (token: string) => {
     const res = await fetch(
-      `${BASE}/api/v1/courses?enrollment_state=active&per_page=50&include[]=total_scores&include[]=current_grading_period_scores`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `${getBase()}/api/v1/courses?enrollment_state=active&per_page=50&include[]=total_scores&include[]=current_grading_period_scores`,
+      { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } }
     );
     if (!res.ok) throw new Error('Failed to fetch courses');
     return res.json();
   },
 
   getAssignments: async (token: string, courseId: string | number) => {
-    const res = await fetch(`${BASE}/api/v1/courses/${courseId}/assignments?per_page=50&order_by=due_at`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${getBase()}/api/v1/courses/${courseId}/assignments?per_page=50&order_by=due_at`, { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } });
     if (!res.ok) throw new Error('Failed to fetch assignments');
     return res.json();
   },
 
   getAnnouncements: async (token: string, courseId: string | number) => {
-    const res = await fetch(`${BASE}/api/v1/courses/${courseId}/discussion_topics?only_announcements=true&per_page=20`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${getBase()}/api/v1/courses/${courseId}/discussion_topics?only_announcements=true&per_page=20`, { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } });
     if (!res.ok) throw new Error('Failed to fetch announcements');
     return res.json();
   },
@@ -46,8 +80,8 @@ export const canvas = {
 
   getSubmissions: async (token: string, courseId: string | number) => {
     const res = await fetch(
-      `${BASE}/api/v1/courses/${courseId}/students/submissions?student_ids[]=self&per_page=100`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `${getBase()}/api/v1/courses/${courseId}/students/submissions?student_ids[]=self&per_page=100`,
+      { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } }
     );
     if (!res.ok) return [];
     return res.json();

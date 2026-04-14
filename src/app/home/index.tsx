@@ -323,32 +323,35 @@ export default function HomeScreen() {
         </View>
 
         {/* ── AI Daily Brief ── */}
-        {(briefLoading || briefText.length > 0) && (
-          <View style={[styles.briefCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.briefHeader}>
-              <View style={[styles.briefIcon, { backgroundColor: '#7c3aed18' }]}>
-                <Zap size={14} color="#7c3aed" fill="#7c3aed" />
-              </View>
-              <Text style={[styles.briefTitle, { color: colors.text }]}>Daily Brief</Text>
-              <TouchableOpacity
-                onPress={() => loadBrief(true)}
-                disabled={briefLoading}
-                style={{ marginLeft: 'auto' as any, padding: 4 }}
-              >
-                <RefreshCw size={13} color={briefLoading ? colors.textTertiary : colors.primary} />
-              </TouchableOpacity>
+        <View style={[styles.briefCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.briefHeader}>
+            <View style={[styles.briefIcon, { backgroundColor: '#7c3aed18' }]}>
+              <Zap size={14} color="#7c3aed" fill="#7c3aed" />
             </View>
-            {briefLoading && briefText === ''
-              ? (
-                <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', paddingVertical: 2 }}>
-                  <ActivityIndicator size="small" color="#7c3aed" />
-                  <Text style={[styles.briefBody, { color: colors.textTertiary }]}>Thinking…</Text>
-                </View>
-              )
-              : <Text style={[styles.briefBody, { color: colors.textSecondary }]}>{briefText}</Text>
-            }
+            <Text style={[styles.briefTitle, { color: colors.text }]}>Daily Brief</Text>
+            <TouchableOpacity
+              onPress={() => loadBrief(true)}
+              disabled={briefLoading}
+              style={{ marginLeft: 'auto' as any, padding: 4 }}
+            >
+              <RefreshCw size={13} color={briefLoading ? colors.textTertiary : colors.primary} />
+            </TouchableOpacity>
           </View>
-        )}
+          {briefLoading && briefText === '' ? (
+            <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', paddingVertical: 2 }}>
+              <ActivityIndicator size="small" color="#7c3aed" />
+              <Text style={[styles.briefBody, { color: colors.textTertiary }]}>Thinking…</Text>
+            </View>
+          ) : briefText.length > 0 ? (
+            <Text style={[styles.briefBody, { color: colors.textSecondary }]}>{briefText}</Text>
+          ) : (
+            <TouchableOpacity onPress={() => loadBrief(true)} activeOpacity={0.7}>
+              <Text style={[styles.briefBody, { color: colors.textTertiary }]}>
+                Tap ↻ to generate your daily brief
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* ── Due today ── */}
         <View style={styles.sectionHeader}>

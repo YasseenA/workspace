@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 // App-specific user data that Clerk doesn't manage
 interface AppUserData {
   school: string;
+  canvasBaseUrl: string;
   major?: string;
   graduationYear?: number;
 }
@@ -18,7 +19,10 @@ interface AuthState {
   resetAppState: () => void;
 }
 
-const defaultAppData: AppUserData = { school: 'Bellevue College' };
+const defaultAppData: AppUserData = {
+  school: 'Bellevue College',
+  canvasBaseUrl: 'https://canvas.bellevuecollege.edu',
+};
 
 const webStorage = {
   getItem: (name: string) => {

@@ -18,36 +18,37 @@ import { claude } from '../../lib/claude';
 
 type EditorMode = 'write' | 'preview' | 'draw';
 type AIMode = 'summarize' | 'explain' | 'studyGuide' | 'ask' | null;
+type DrawTool = 'pen' | 'highlighter' | 'eraser';
 
 // ── Templates (HTML for web, markdown for native) ────────────────────────────
 const TEMPLATES = [
   {
     emoji: '📚', label: 'Lecture Notes',
-    title: 'Lecture Notes — ',
+    title: 'Lecture Notes',
     md: '## Key Points\n- \n- \n- \n\n## Details\n\n\n## Summary\n',
     html: '<h2>Key Points</h2><ul><li></li><li></li><li></li></ul><h2>Details</h2><p><br></p><h2>Summary</h2><p><br></p>',
   },
   {
     emoji: '🧪', label: 'Study Guide',
-    title: 'Study Guide — ',
+    title: 'Study Guide',
     md: '## Core Concepts\n1. \n2. \n3. \n\n## Key Terms\n- **Term**: Definition\n\n## Practice Questions\n1. \n',
     html: '<h2>Core Concepts</h2><ol><li></li><li></li><li></li></ol><h2>Key Terms</h2><ul><li><strong>Term</strong>: Definition</li></ul><h2>Practice Questions</h2><ol><li></li></ol>',
   },
   {
     emoji: '🧠', label: 'Cornell Notes',
-    title: 'Cornell Notes — ',
+    title: 'Cornell Notes',
     md: '## Cues (Key Questions)\n- \n- \n\n## Notes\n\n\n## Summary\n',
     html: '<h2>Cues (Key Questions)</h2><ul><li></li><li></li></ul><h2>Notes</h2><p><br></p><h2>Summary</h2><p><br></p>',
   },
   {
     emoji: '📋', label: 'Meeting Notes',
-    title: 'Meeting — ',
+    title: 'Meeting Notes',
     md: '**Date:** \n**With:** \n\n## Agenda\n1. \n\n## Discussion\n\n\n## Action Items\n- [ ] \n',
     html: '<p><strong>Date:</strong> </p><p><strong>With:</strong> </p><h2>Agenda</h2><ol><li></li></ol><h2>Discussion</h2><p><br></p><h2>Action Items</h2><ul><li></li></ul>',
   },
   {
     emoji: '✅', label: 'To-Do List',
-    title: 'To-Do — ',
+    title: 'To-Do List',
     md: '## Tasks\n- [ ] \n- [ ] \n- [ ] \n\n## Notes\n',
     html: '<h2>Tasks</h2><ul><li></li><li></li><li></li></ul><h2>Notes</h2><p><br></p>',
   },
@@ -140,12 +141,16 @@ export default function NoteEditorScreen() {
   const [showTemplates, setShowTemplates] = useState(!id && !existingNote);
 
   // Drawing
-  const [drawColor,  setDrawColor]  = useState('#7c3aed');
-  const [brushSize,  setBrushSize]  = useState(3);
-  const [isEraser,   setIsEraser]   = useState(false);
+  const [drawColor,      setDrawColor]      = useState('#7c3aed');
+  const [brushSize,      setBrushSize]      = useState(3);
+  const [drawTool,       setDrawTool]       = useState<DrawTool>('pen');
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const canvasRef    = useRef<any>(null);
   const isDrawingRef = useRef(false);
   const lastPos      = useRef<{ x: number; y: number } | null>(null);
+  // Refs so imperative touch handlers always see current values
+  const drawStateRef = useRef({ color: '#7c3aed', size: 3, tool: 'pen' as DrawTool });
+  useEffect(() => { drawStateRef.current = { color: drawColor, size: brushSize, tool: drawTool }; }, [drawColor, brushSize, drawTool]);
 
   const autoSaveRef    = useRef<any>(null);
   // On web: points to the contenteditable div
@@ -153,7 +158,10 @@ export default function NoteEditorScreen() {
   const contentRef     = useRef<any>(null);
   const ceInitialized  = useRef(false);
 
-  const DRAW_COLORS = ['#7c3aed','#ef4444','#10b981','#f97316','#3b82f6','#ec4899','#0a0a0a','#ffffff'];
+  const DRAW_COLORS = [
+    '#0a0a0a','#ffffff','#7c3aed','#3b82f6','#06b6d4',
+    '#10b981','#84cc16','#f59e0b','#f97316','#ef4444','#ec4899','#a78bfa',
+  ];
   const IS_WEB = Platform.OS === 'web';
 
   // ── Initialize contenteditable on web ─────────────────────────────────────
@@ -194,15 +202,97 @@ export default function NoteEditorScreen() {
 
   // ── Drawing canvas setup ───────────────────────────────────────────────────
   useEffect(() => {
-    if (mode === 'draw' && IS_WEB && canvasRef.current) {
-      const canvas = canvasRef.current;
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight || 400;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = colors.card;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (mode !== 'draw' || !IS_WEB || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    let initialized = false;
+
+    const initCanvas = () => {
+      const w = canvas.offsetWidth || canvas.parentElement?.offsetWidth || window.innerWidth;
+      const h = canvas.offsetHeight || canvas.parentElement?.offsetHeight || 500;
+      if (w > 10 && h > 10 && !initialized) {
+        initialized = true;
+        canvas.width  = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = colors.card;
+        ctx.fillRect(0, 0, w, h);
+      }
+    };
+
+    // Try immediately, then via rAF (layout may not be complete yet)
+    initCanvas();
+    const raf = requestAnimationFrame(initCanvas);
+
+    // ResizeObserver for when dimensions become available after layout
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(initCanvas);
+      ro.observe(canvas);
     }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
   }, [mode, colors.card]);
+
+  // ── iOS touch events (must be non-passive to call preventDefault) ───────────
+  useEffect(() => {
+    if (mode !== 'draw' || !IS_WEB || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+
+    const onTouchStart = (e: TouchEvent) => {
+      isDrawingRef.current = true;
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches[0];
+      lastPos.current = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (!isDrawingRef.current || !lastPos.current) return;
+      const { color, size, tool } = drawStateRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches[0];
+      const pos = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      if (tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = size * 5;
+      } else if (tool === 'highlighter') {
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = size * 5;
+      } else {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = size;
+      }
+      ctx.beginPath();
+      ctx.moveTo(lastPos.current.x, lastPos.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+      lastPos.current = pos;
+    };
+
+    const onTouchEnd = () => {
+      isDrawingRef.current = false;
+      lastPos.current = null;
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    canvas.addEventListener('touchend',   onTouchEnd,   { passive: false });
+
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove',  onTouchMove);
+      canvas.removeEventListener('touchend',   onTouchEnd);
+    };
+  }, [mode]);
 
   // ── WYSIWYG helpers (web) ─────────────────────────────────────────────────
   const execCmd = useCallback((cmd: string, val?: string) => {
@@ -278,20 +368,59 @@ export default function NoteEditorScreen() {
     const cy = e.touches ? e.touches[0].clientY : e.clientY;
     return { x: cx - rect.left, y: cy - rect.top };
   };
-  const startDraw = (e: any) => { if (!canvasRef.current) return; isDrawingRef.current = true; lastPos.current = getPos(e, canvasRef.current); };
+  const startDraw = (e: any) => {
+    if (!canvasRef.current) return;
+    isDrawingRef.current = true;
+    lastPos.current = getPos(e, canvasRef.current);
+  };
   const draw = (e: any) => {
     if (!isDrawingRef.current || !canvasRef.current || !lastPos.current) return;
     e.preventDefault();
-    const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
     const pos = getPos(e, canvas);
-    ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = isEraser ? colors.card : drawColor; ctx.lineWidth = isEraser ? brushSize * 4 : brushSize;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.save();
+    if (drawTool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = brushSize * 5;
+    } else if (drawTool === 'highlighter') {
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = drawColor;
+      ctx.lineWidth = brushSize * 5;
+    } else {
+      ctx.strokeStyle = drawColor;
+      ctx.lineWidth = brushSize;
+    }
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
     lastPos.current = pos;
   };
   const endDraw  = () => { isDrawingRef.current = false; lastPos.current = null; };
-  const clearCanvas  = () => { if (!canvasRef.current) return; const ctx = canvasRef.current.getContext('2d'); ctx.fillStyle = colors.card; ctx.fillRect(0,0,canvasRef.current.width,canvasRef.current.height); };
-  const insertDrawing = () => { if (!canvasRef.current) return; setImages(prev => [...prev, canvasRef.current.toDataURL('image/png')]); setMode('write'); };
+  const clearCanvas = () => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    ctx.fillStyle = colors.card;
+    ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+  };
+  const insertDrawing = () => {
+    if (!canvasRef.current) return;
+    const dataUrl = canvasRef.current.toDataURL('image/png');
+    if (IS_WEB && contentRef.current) {
+      // Insert inline at the TOP of the note content, displayed small
+      const imgTag = `<img src="${dataUrl}" alt="Drawing" style="max-width:280px;width:45%;border-radius:10px;border:1px solid ${colors.border};display:block;margin:0 0 12px 0" />`;
+      contentRef.current.innerHTML = imgTag + contentRef.current.innerHTML;
+      setContent(contentRef.current.innerHTML);
+    } else {
+      setImages(prev => [...prev, dataUrl]);
+    }
+    setMode('write');
+  };
 
   // ── Save on back ───────────────────────────────────────────────────────────
   const handleSave = () => {
@@ -780,37 +909,112 @@ ${html}
         {/* ── Draw mode ── */}
         {mode === 'draw' && (
           <View style={{ flex: 1 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              style={[styles.drawBar, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}
-              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 }}>
-              {DRAW_COLORS.map(c => (
-                <TouchableOpacity key={c} onPress={() => { setDrawColor(c); setIsEraser(false); }}
-                  style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c, borderWidth: drawColor === c && !isEraser ? 3 : 1, borderColor: colors.border }} />
-              ))}
-              <View style={{ width: 1, height: 24, backgroundColor: colors.border, marginHorizontal: 4 }} />
-              {[2, 4, 8].map(s => (
-                <TouchableOpacity key={s} onPress={() => setBrushSize(s)}
-                  style={[styles.sizeBtn, { borderColor: brushSize === s ? colors.primary : colors.border }]}>
-                  <View style={{ width: s * 2, height: s * 2, borderRadius: s, backgroundColor: colors.text }} />
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity onPress={() => setIsEraser(!isEraser)}
-                style={[styles.toolBtn, { backgroundColor: isEraser ? colors.error + '20' : 'transparent', borderColor: colors.border }]}>
-                <Eraser size={16} color={isEraser ? colors.error : colors.textSecondary} />
+            {/* ── Draw Toolbar ── */}
+            <View style={[styles.drawToolbar, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
+
+              {/* Tool selector pills */}
+              <View style={[styles.drawToolGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {([
+                  { key: 'pen',         label: 'Pen',    icon: '✏️' },
+                  { key: 'highlighter', label: 'Marker', icon: '🖊' },
+                  { key: 'eraser',      label: 'Erase',  icon: '⬜' },
+                ] as { key: DrawTool; label: string; icon: string }[]).map(tool => (
+                  <TouchableOpacity
+                    key={tool.key}
+                    onPress={() => setDrawTool(tool.key)}
+                    style={[
+                      styles.drawToolBtn,
+                      drawTool === tool.key && {
+                        backgroundColor: tool.key === 'eraser' ? colors.error + '22' : colors.primary + '18',
+                      },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 14 }}>{tool.icon}</Text>
+                    <Text style={{
+                      fontSize: 10, fontWeight: '700',
+                      color: drawTool === tool.key
+                        ? (tool.key === 'eraser' ? colors.error : colors.primary)
+                        : colors.textTertiary,
+                    }}>{tool.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Size dots */}
+              <View style={[styles.drawToolGroup, { backgroundColor: colors.card, borderColor: colors.border, gap: 10 }]}>
+                {[2, 4, 7].map(s => (
+                  <TouchableOpacity key={s} onPress={() => setBrushSize(s)} style={styles.sizeDotBtn}>
+                    <View style={{
+                      width: Math.max(6, s * 2.2), height: Math.max(6, s * 2.2),
+                      borderRadius: s * 2,
+                      backgroundColor: brushSize === s ? (drawTool === 'eraser' ? colors.error : drawColor) : colors.textTertiary,
+                      opacity: brushSize === s ? 1 : 0.3,
+                    }} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Color swatch — tap to open picker */}
+              <TouchableOpacity
+                onPress={() => setShowColorPicker(v => !v)}
+                style={[styles.colorSwatchBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: drawColor, borderWidth: 1.5, borderColor: colors.border }} />
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary }}>Color</Text>
+                <Text style={{ fontSize: 9, color: colors.textTertiary }}>{showColorPicker ? '▲' : '▼'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={clearCanvas} style={[styles.toolBtn, { borderColor: colors.border }]}>
-                <Trash2 size={16} color={colors.textSecondary} />
+
+              <View style={{ flex: 1 }} />
+
+              {/* Clear */}
+              <TouchableOpacity onPress={clearCanvas} style={[styles.drawIconBtn, { borderColor: colors.border }]}>
+                <Trash2 size={14} color={colors.textTertiary} />
               </TouchableOpacity>
+
+              {/* Insert */}
               <TouchableOpacity onPress={insertDrawing} style={[styles.insertBtn, { backgroundColor: colors.primary }]}>
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Insert into Note</Text>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Insert ↑</Text>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
+
+            {/* ── Color Picker Panel ── */}
+            {showColorPicker && (
+              <View style={[styles.colorPickerPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                  {DRAW_COLORS.map(c => (
+                    <TouchableOpacity
+                      key={c}
+                      onPress={() => {
+                        setDrawColor(c);
+                        if (drawTool === 'eraser') setDrawTool('pen');
+                        setShowColorPicker(false);
+                      }}
+                      style={{
+                        width: 30, height: 30, borderRadius: 15,
+                        backgroundColor: c,
+                        borderWidth: drawColor === c ? 3 : 1.5,
+                        borderColor: drawColor === c ? colors.primary : colors.border,
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* ── Canvas ── */}
             {IS_WEB && (
               <canvas
                 ref={canvasRef}
-                style={{ flex: 1, width: '100%', cursor: isEraser ? 'cell' : 'crosshair', touchAction: 'none', backgroundColor: colors.card } as any}
-                onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
-                onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
+                style={{
+                  flex: 1, width: '100%', display: 'block',
+                  cursor: drawTool === 'eraser' ? 'cell' : 'crosshair',
+                  touchAction: 'none',
+                  backgroundColor: colors.card,
+                } as any}
+                onMouseDown={startDraw}
+                onMouseMove={draw}
+                onMouseUp={endDraw}
+                onMouseLeave={endDraw}
               />
             )}
           </View>
@@ -849,9 +1053,13 @@ const styles = StyleSheet.create({
 
   editHintBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 32, paddingVertical: 12, borderTopWidth: 0.5 },
 
-  drawBar:      { paddingVertical: 10, borderBottomWidth: 0.5 },
-  sizeBtn:      { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  toolBtn:      { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  insertBtn:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginLeft: 8 },
-  imgDeleteBtn: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  drawToolbar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 0.5, gap: 8 },
+  drawToolGroup:   { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
+  drawToolBtn:     { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 6, gap: 2 },
+  sizeDotBtn:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  colorSwatchBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  drawIconBtn:     { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  colorPickerPanel:{ position: 'absolute' as any, top: 57, left: 0, right: 0, zIndex: 100, padding: 14, borderBottomWidth: 1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8 },
+  insertBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
+  imgDeleteBtn:    { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 });

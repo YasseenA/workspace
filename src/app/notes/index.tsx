@@ -91,7 +91,9 @@ function NoteCard({ item, viewMode, showMore, setShowMore, togglePin, toggleFavo
           </View>
 
           <Text style={[styles.noteExcerpt, { color: colors.textSecondary }]} numberOfLines={viewMode === 'grid' ? 4 : 2}>
-            {item.excerpt || 'No content yet'}
+            {item.excerpt
+              ? item.excerpt.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').replace(/[*#`~_]+/g, '').trim() || 'No content yet'
+              : 'No content yet'}
           </Text>
 
           <View style={styles.noteMeta}>
