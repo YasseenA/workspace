@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL  = process.env.EXPO_PUBLIC_SUPABASE_URL  || 'https://dcdlmfqayfrfpctuwnja.supabase.co';
-const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_zUUxpQ554xif479NUBAmFA_F3eJI2ab';
+const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZGxtZnFheWZyZnBjdHV3bmphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMzU4NjMsImV4cCI6MjA5MTcxMTg2M30.CY4fUoKpRTAV9oAezcGtEyzpZqQcxNy7NcJByEHpNDc';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: false }, // Clerk handles auth, not Supabase
