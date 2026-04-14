@@ -198,8 +198,8 @@ If you get "Failed to fetch": ensure `node canvas-proxy.js` is running and resta
 | Study Buddy chat | `src/app/study-buddy/index.tsx`, `src/store/studyBuddy.ts` |
 
 ### Pending features (next phases)
-1. **Email Draft UI** — `claude.emailDraft(context, type)` exists but no UI. Build at `/email` or as AI Studio tab. Types: `'professor' | 'extension' | 'internship' | 'group'`
-2. **Weekly Planner UI** — `claude.weeklyPlanner(tasks, hours)` exists but no UI. Could be home card or tasks tab
+1. **Email Draft UI** — DONE ✓. Screen at `/email`. Type picker (professor/extension/internship/group), context input, Claude draft, copy button. Linked from home screen banner.
+2. **Weekly Planner UI** — DONE ✓. Screen at `/planner`. Pulls pending tasks + upcoming Canvas assignments, hours selector, generates day-by-day plan via `claude.weeklyPlanner()`. Linked from home screen banner.
 3. **Offline mode** — Cache Canvas data; queue changes (complex, Phase 3)
 4. **iOS/Android store submission** (Phase 4)
 

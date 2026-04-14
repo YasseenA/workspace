@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { useSettingsStore } from '../store/settings';
 
-const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const CLERK_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 
 // Persist Clerk tokens in localStorage on web (prevents logout on page refresh)
 const tokenCache = {
@@ -29,15 +29,22 @@ function ThemedStatusBar() {
   return <StatusBar style={darkMode ? 'light' : 'dark'} />;
 }
 
+const Inner = () => (
+  <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+      <ThemedStatusBar />
+    </SafeAreaProvider>
+  </GestureHandlerRootView>
+);
+
 export default function RootLayout() {
+  if (!CLERK_KEY) {
+    return <Inner />;
+  }
   return (
     <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <Stack screenOptions={{ headerShown: false }} />
-          <ThemedStatusBar />
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <Inner />
     </ClerkProvider>
   );
 }

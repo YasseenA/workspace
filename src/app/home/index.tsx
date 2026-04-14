@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import {
   FileText, CheckSquare, Zap, Timer,
   Plus, ChevronRight, Clock, BookOpen,
-  Calendar, ArrowRight, MessageCircle, RefreshCw, Search,
+  Calendar, ArrowRight, MessageCircle, RefreshCw, Search, Mail,
 } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
@@ -280,6 +280,47 @@ export default function HomeScreen() {
           </View>
           <ChevronRight size={16} color="#7c3aed" />
         </TouchableOpacity>
+
+        {/* ── Email Draft + Weekly Planner row ── */}
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 0 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/email' as any)}
+            style={[styles.buddyCard, { flex: 1, borderColor: '#f9731630', marginBottom: 10 }]}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'web'
+              ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #f9731618 0%, #ea580c10 100%)' }} />
+              : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#f973160d' }} />
+            }
+            <View style={[styles.buddyIconWrap, { backgroundColor: '#f97316' }]}>
+              <Mail size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.buddyTitle, { color: colors.text }]}>Email Draft</Text>
+              <Text style={[styles.buddySub, { color: colors.textTertiary }]}>AI-written student emails</Text>
+            </View>
+            <ChevronRight size={16} color="#f97316" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push('/planner' as any)}
+            style={[styles.buddyCard, { flex: 1, borderColor: '#10b98130', marginBottom: 10 }]}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'web'
+              ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #10b98118 0%, #05966910 100%)' }} />
+              : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#10b9810d' }} />
+            }
+            <View style={[styles.buddyIconWrap, { backgroundColor: '#10b981' }]}>
+              <Calendar size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.buddyTitle, { color: colors.text }]}>Planner</Text>
+              <Text style={[styles.buddySub, { color: colors.textTertiary }]}>Weekly study schedule</Text>
+            </View>
+            <ChevronRight size={16} color="#10b981" />
+          </TouchableOpacity>
+        </View>
 
         {/* ── AI Daily Brief ── */}
         {(briefLoading || briefText.length > 0) && (
