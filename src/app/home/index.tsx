@@ -202,8 +202,15 @@ export default function HomeScreen() {
   const pendingTasks  = tasks.filter(t => t.status !== 'done').slice(0, 4);
   const courseMap     = new Map(courses.map(c => [c.id, c]));
 
+  const _hex = (h: string, f: number) => {
+    const n = parseInt(h.replace('#',''), 16);
+    const r = Math.max(0, Math.min(255, Math.round(((n>>16)&0xff)*f)));
+    const g = Math.max(0, Math.min(255, Math.round(((n>>8)&0xff)*f)));
+    const b = Math.max(0, Math.min(255, Math.round((n&0xff)*f)));
+    return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
+  };
   const heroGradient: any = Platform.OS === 'web'
-    ? { background: 'linear-gradient(135deg, #7c3aed 0%, #4338ca 70%, #312e81 100%)' }
+    ? { background: `linear-gradient(135deg, ${colors.primary} 0%, ${_hex(colors.primary,0.72)} 70%, ${_hex(colors.primary,0.52)} 100%)` }
     : { backgroundColor: colors.primary };
 
   const dayLabel = (dateStr: string) => {
@@ -568,7 +575,7 @@ export default function HomeScreen() {
                 <ChevronRight size={14} color={colors.primary} />
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
               {courses
                 .filter(c => c.enrollments?.[0]?.computed_current_score != null)
                 .slice(0, 6)
@@ -732,7 +739,7 @@ const styles = StyleSheet.create({
 
   /* Grade card */
   gradeCard: {
-    flex: 1, minWidth: 90, alignItems: 'center', paddingVertical: 14,
+    width: 100, alignItems: 'center', paddingVertical: 14,
     borderRadius: 16, borderWidth: 0.5,
   },
 

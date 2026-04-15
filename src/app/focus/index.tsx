@@ -256,14 +256,12 @@ export default function FocusScreen() {
               Platform.OS === 'web' ? (
                 // @ts-ignore
                 <input
-                  type="number"
+                  type="text"
                   value={editValue}
                   onChange={(e: any) => setEditValue(e.target.value)}
                   onBlur={commitEdit}
                   onKeyDown={(e: any) => e.key === 'Enter' && commitEdit()}
                   autoFocus
-                  min={1}
-                  max={480}
                   placeholder="25"
                   style={{
                     fontSize: 52, fontWeight: '800', letterSpacing: -1, textAlign: 'center',

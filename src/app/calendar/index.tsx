@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   dayLabels:  { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 8 },
   dayLabel:   { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8 },
-  cell:       { width: `${100/7}%` as any, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
+  cell:       { width: `${100/7}%` as any, height: 52, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
   emptyDay:   { borderRadius: 16, borderWidth: 0.5, padding: 32, alignItems: 'center' },
   itemRow:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 0.5, marginBottom: 8, overflow: 'hidden', paddingVertical: 12 },
   itemStrip:  { width: 4, alignSelf: 'stretch' },

@@ -148,6 +148,9 @@ export default function NoteEditorScreen() {
   // presetApplied ref — used after IS_WEB / contentRef are defined below
   const presetApplied = useRef(false);
 
+  // Lightbox for drawings
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+
   // Drawing
   const [drawColor,      setDrawColor]      = useState('#7c3aed');
   const [brushSize,      setBrushSize]      = useState(3);
@@ -196,6 +199,16 @@ export default function NoteEditorScreen() {
         ? src
         : buildMarkdownHtml(src, colors.text, colors.textSecondary, colors.border, colors.primary);
     }
+  }, []);
+
+  // ── Lightbox: click img in contenteditable to enlarge ─────────────────────
+  useEffect(() => {
+    if (!IS_WEB) return;
+    const handler = (e: any) => {
+      if (e.target?.tagName === 'IMG') setLightboxImg(e.target.src);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, []);
 
   // ── Auto-save ──────────────────────────────────────────────────────────────
@@ -432,8 +445,8 @@ export default function NoteEditorScreen() {
     if (!canvasRef.current) return;
     const dataUrl = canvasRef.current.toDataURL('image/png');
     if (IS_WEB && contentRef.current) {
-      // Insert inline at the TOP of the note content, displayed small
-      const imgTag = `<img src="${dataUrl}" alt="Drawing" style="max-width:280px;width:45%;border-radius:10px;border:1px solid ${colors.border};display:block;margin:0 0 12px 0" />`;
+      // Insert as small clickable thumbnail — click to enlarge via lightbox
+      const imgTag = `<img src="${dataUrl}" alt="Drawing" style="width:120px;height:88px;object-fit:cover;border-radius:10px;border:1px solid ${colors.border};cursor:pointer;display:inline-block;margin:0 8px 8px 0" />`;
       contentRef.current.innerHTML = imgTag + contentRef.current.innerHTML;
       setContent(contentRef.current.innerHTML);
     } else {
@@ -566,43 +579,44 @@ ${html}
 
         {/* ── Header ── */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={handleSave} style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <ArrowLeft size={20} color={colors.text} />
-          </TouchableOpacity>
-
-          {/* Mode tabs */}
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            {(['write', 'preview'] as EditorMode[]).map(m => (
-              <TouchableOpacity key={m} onPress={() => setMode(m)}
-                style={[styles.modeTab, {
-                  backgroundColor: mode === m ? colors.primary + '18' : 'transparent',
-                  borderColor: mode === m ? colors.primary + '40' : 'transparent',
-                }]}>
-                {m === 'write'
-                  ? <Pencil size={13} color={mode === 'write'   ? colors.primary : colors.textTertiary} />
-                  : <Eye    size={13} color={mode === 'preview' ? colors.primary : colors.textTertiary} />}
-                <Text style={{ fontSize: 12, fontWeight: '600', color: mode === m ? colors.primary : colors.textTertiary }}>
-                  {m.charAt(0).toUpperCase() + m.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {IS_WEB && (
-              <TouchableOpacity onPress={() => setMode('draw')}
-                style={[styles.modeTab, {
-                  backgroundColor: mode === 'draw' ? colors.accent + '18' : 'transparent',
-                  borderColor:     mode === 'draw' ? colors.accent + '40' : 'transparent',
-                }]}>
-                <Pencil size={13} color={mode === 'draw' ? colors.accent : colors.textTertiary} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: mode === 'draw' ? colors.accent : colors.textTertiary }}>Draw</Text>
-              </TouchableOpacity>
-            )}
+          {/* Left: back + mode tabs */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity onPress={handleSave} style={[styles.iconBtn, { borderColor: colors.border }]}>
+              <ArrowLeft size={20} color={colors.text} />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              {(['write', 'preview'] as EditorMode[]).map(m => (
+                <TouchableOpacity key={m} onPress={() => setMode(m)}
+                  style={[styles.modeTab, {
+                    backgroundColor: mode === m ? colors.primary + '18' : 'transparent',
+                    borderColor: mode === m ? colors.primary + '40' : 'transparent',
+                  }]}>
+                  {m === 'write'
+                    ? <Pencil size={13} color={mode === 'write'   ? colors.primary : colors.textTertiary} />
+                    : <Eye    size={13} color={mode === 'preview' ? colors.primary : colors.textTertiary} />}
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: mode === m ? colors.primary : colors.textTertiary }}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {IS_WEB && (
+                <TouchableOpacity onPress={() => setMode('draw')}
+                  style={[styles.modeTab, {
+                    backgroundColor: mode === 'draw' ? colors.accent + '18' : 'transparent',
+                    borderColor:     mode === 'draw' ? colors.accent + '40' : 'transparent',
+                  }]}>
+                  <Pencil size={13} color={mode === 'draw' ? colors.accent : colors.textTertiary} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: mode === 'draw' ? colors.accent : colors.textTertiary }}>Draw</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
-          <Text style={{ fontSize: 11, color: colors.textTertiary }}>
-            {wc > 0 ? `${wc}w · ${readMins}min` : '0 words'}
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          {/* Right: word count + actions */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+              {wc > 0 ? `${wc}w · ${readMins}min` : ''}
+            </Text>
             {existingNote && (<>
               <TouchableOpacity onPress={() => togglePin(existingNote.id)} style={[styles.iconBtn, { borderColor: colors.border }]}>
                 <Pin size={15} color={existingNote.isPinned ? colors.warning : colors.textTertiary} fill={existingNote.isPinned ? colors.warning : 'none'} />
@@ -1038,6 +1052,26 @@ ${html}
               />
             )}
           </View>
+        )}
+
+        {/* ── Drawing lightbox ── */}
+        {lightboxImg && IS_WEB && (
+          <TouchableOpacity
+            onPress={() => setLightboxImg(null)}
+            style={{
+              position: 'absolute' as any, top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.92)',
+              alignItems: 'center', justifyContent: 'center',
+              zIndex: 9999,
+            }}
+          >
+            {/* @ts-ignore */}
+            <img
+              src={lightboxImg}
+              style={{ maxWidth: '90%', maxHeight: '85vh', borderRadius: 14, objectFit: 'contain' } as any}
+            />
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>Tap anywhere to close</Text>
+          </TouchableOpacity>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
