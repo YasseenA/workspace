@@ -9,12 +9,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
 
 // Run this SQL in Supabase → SQL Editor to create all tables:
 //
+// -- If upgrading an existing DB, run the migration block at the bottom instead.
+//
 // create table profiles (
 //   user_id text primary key,
 //   school text default 'Bellevue College',
 //   canvas_base_url text default 'https://canvas.bellevuecollege.edu',
 //   dark_mode boolean default false,
 //   notifications_enabled boolean default true,
+//   accent_color text default '#7c3aed',
 //   has_onboarded boolean default false,
 //   work_minutes int default 25,
 //   break_minutes int default 5,
@@ -27,8 +30,19 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
 //   canvas_assignments jsonb default '[]',
 //   canvas_submissions jsonb default '[]',
 //   canvas_last_sync timestamptz,
+//   teams_token text,
+//   teams_courses jsonb default '[]',
+//   teams_assignments jsonb default '[]',
+//   teams_last_sync timestamptz,
 //   created_at timestamptz default now()
 // );
+//
+// -- ── Migration for existing databases ───────────────────────────────────────
+// alter table profiles add column if not exists accent_color text default '#7c3aed';
+// alter table profiles add column if not exists teams_token text;
+// alter table profiles add column if not exists teams_courses jsonb default '[]';
+// alter table profiles add column if not exists teams_assignments jsonb default '[]';
+// alter table profiles add column if not exists teams_last_sync timestamptz;
 //
 // create table notebooks (
 //   id text primary key,
