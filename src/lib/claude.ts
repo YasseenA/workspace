@@ -10,9 +10,19 @@ const API = Platform.OS === 'web'
 
 const MODEL = 'claude-sonnet-4-20250514';
 
+function getApiKey(): string {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const userKey = localStorage.getItem('user_claude_api_key');
+      if (userKey) return userKey;
+    }
+  } catch {}
+  return process.env.EXPO_PUBLIC_CLAUDE_API_KEY || '';
+}
+
 async function call(system: string, user: string, maxTokens = 2048): Promise<string> {
-  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
-  if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
+  const key = getApiKey();
+  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
   const res = await fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
@@ -56,8 +66,8 @@ export async function streamCall(
   onChunk: (text: string) => void,
   maxTokens = 2048
 ): Promise<string> {
-  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
-  if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
+  const key = getApiKey();
+  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
   const res = await fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
@@ -73,8 +83,8 @@ export async function streamChat(
   onChunk: (text: string) => void,
   maxTokens = 2048
 ): Promise<string> {
-  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
-  if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
+  const key = getApiKey();
+  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
   const res = await fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
@@ -85,8 +95,8 @@ export async function streamChat(
 }
 
 async function callWithImage(system: string, userText: string, imageBase64: string, mediaType: string, maxTokens = 2048): Promise<string> {
-  const key = process.env.EXPO_PUBLIC_CLAUDE_API_KEY;
-  if (!key) throw new Error('Add EXPO_PUBLIC_CLAUDE_API_KEY to your .env file');
+  const key = getApiKey();
+  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
   const content: any[] = [
     { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
   ];

@@ -171,6 +171,12 @@ export default function SettingsScreen() {
               label="Claude AI"
               value="Active"
               onPress={() => router.push('/ai-studio')}
+            />
+            <Row
+              icon={Bot} iconColor="#d946ef"
+              label="AI API Keys"
+              value={typeof localStorage !== 'undefined' && localStorage.getItem('user_claude_api_key') ? 'Configured ✓' : 'Not set'}
+              onPress={() => router.push('/settings/ai-keys')}
               last
             />
           </Section>
