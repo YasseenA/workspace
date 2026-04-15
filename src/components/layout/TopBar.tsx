@@ -19,12 +19,7 @@ export default function TopBar() {
     ]}>
       {/* Logo */}
       <TouchableOpacity onPress={() => router.push('/')} style={styles.logo} activeOpacity={0.7}>
-        {Platform.OS === 'web' ? (
-          // @ts-ignore
-          <img src="/assets/icon.png" style={{ width: 30, height: 30, objectFit: 'contain' }} />
-        ) : (
-          <Image source={require('../../../assets/icon.png')} style={{ width: 30, height: 30 }} resizeMode="contain" />
-        )}
+        <Image source={require('../../../assets/icon.png')} style={{ width: 30, height: 30 }} resizeMode="contain" />
         <Text style={[styles.logoText, { color: colors.text }]}>Workspace</Text>
       </TouchableOpacity>
 
