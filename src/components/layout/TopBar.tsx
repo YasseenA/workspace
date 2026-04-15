@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Zap } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useColors } from '../../lib/theme';
 import { initials } from '../../utils/helpers';
@@ -20,9 +19,12 @@ export default function TopBar() {
     ]}>
       {/* Logo */}
       <TouchableOpacity onPress={() => router.push('/')} style={styles.logo} activeOpacity={0.7}>
-        <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-          <Zap size={14} color="#fff" fill="#fff" />
-        </View>
+        {Platform.OS === 'web' ? (
+          // @ts-ignore
+          <img src="/assets/icon.png" style={{ width: 30, height: 30, objectFit: 'contain' }} />
+        ) : (
+          <Image source={require('../../../assets/icon.png')} style={{ width: 30, height: 30 }} resizeMode="contain" />
+        )}
         <Text style={[styles.logoText, { color: colors.text }]}>Workspace</Text>
       </TouchableOpacity>
 
@@ -53,10 +55,6 @@ const styles = StyleSheet.create({
       : {}),
   },
   logo: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  logoIcon: {
-    width: 30, height: 30, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
-  },
   logoText: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
 
   avatar: {
