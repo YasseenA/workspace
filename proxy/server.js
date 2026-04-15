@@ -80,6 +80,12 @@ const server = http.createServer((req, res) => {
 
   const path = req.url || '/';
 
+  if (path === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
+    return;
+  }
+
   if (path.startsWith('/ical')) {
     // Fetch any iCal feed URL — used for schools that block personal access tokens
     const params = new URLSearchParams((path.split('?')[1] || ''));
