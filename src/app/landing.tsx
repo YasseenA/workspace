@@ -55,8 +55,8 @@ function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: '
       formFieldInput:     { background: '#0f172a', border: '1px solid #1e293b', color: '#f1f5f9', borderRadius: '10px' },
       formFieldInputShowPasswordButton: { color: '#64748b' },
       formButtonPrimary:  { background: '#7c3aed', borderRadius: '12px', fontWeight: '700', fontSize: '15px' },
-      // Hide Clerk's own footer nav — we use our own tab switcher below
-      footer:             { display: 'none' },
+      footer:             { background: '#18181f', borderTop: '1px solid #2a2a38' },
+      footerActionLink:   { color: '#a78bfa', fontWeight: '700' },
       identityPreviewText:{ color: '#f1f5f9' },
       identityPreviewEditButton: { color: '#a78bfa' },
     },
@@ -83,8 +83,6 @@ function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: '
           <style>{`
             .cl-card { background: #18181f !important; }
             .cl-internal-b3fm6y { background: #18181f !important; }
-            .cl-footer { display: none !important; }
-            .cl-footerAction { display: none !important; }
           `}</style>
         )}
 
@@ -102,17 +100,6 @@ function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: '
           />
         )}
 
-        {/* Tab switcher below Clerk UI */}
-        <View style={styles.tabRow}>
-          <Text style={{ color: '#475569', fontSize: 13 }}>
-            {tab === 'in' ? "Don't have an account?" : 'Already have an account?'}
-          </Text>
-          <TouchableOpacity onPress={() => setTab(tab === 'in' ? 'up' : 'in')}>
-            <Text style={{ color: '#a78bfa', fontSize: 13, fontWeight: '700', marginLeft: 5 }}>
-              {tab === 'in' ? 'Sign up' : 'Sign in'}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </View>
   );
