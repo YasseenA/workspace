@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { SignIn, SignUp } from '@clerk/clerk-expo/web';
 import { useAuthStore } from '../store/auth';
 import {
-  Zap, FileText, CheckSquare, Timer,
-  BookOpen, TrendingUp, X, ArrowRight, Sparkles,
+  FileText, CheckSquare, Timer,
+  BookOpen, TrendingUp, X, ArrowRight, Sparkles, Zap,
 } from 'lucide-react-native';
 
 /* ── Auth Modal — uses Clerk's pre-built UI ── */
@@ -142,9 +142,7 @@ export default function LandingPage() {
         {/* ── Nav ── */}
         <View style={styles.nav}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={styles.navLogo}>
-              <Zap size={16} color="#fff" fill="#fff" />
-            </View>
+            <Image source={require('../../assets/icon.png')} style={{ width: 32, height: 32 }} resizeMode="contain" />
             <Text style={styles.navBrand}>Workspace</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -159,6 +157,7 @@ export default function LandingPage() {
 
         {/* ── Hero ── */}
         <View style={styles.hero}>
+          <Image source={require('../../assets/icon.png')} style={{ width: 72, height: 72, marginBottom: 16 }} resizeMode="contain" />
           <View style={styles.heroBadge}>
             <Sparkles size={12} color="#a78bfa" />
             <Text style={styles.heroBadgeTxt}>Built for college students</Text>
@@ -211,9 +210,7 @@ export default function LandingPage() {
         {/* ── Footer ── */}
         <View style={styles.footer}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={[styles.navLogo, { width: 22, height: 22, borderRadius: 6 }]}>
-              <Zap size={11} color="#fff" fill="#fff" />
-            </View>
+            <Image source={require('../../assets/icon.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
             <Text style={{ color: '#475569', fontSize: 13 }}>Workspace · Your Academic Hub</Text>
           </View>
           <Text style={{ color: '#334155', fontSize: 12 }}>Powered by Claude AI</Text>
