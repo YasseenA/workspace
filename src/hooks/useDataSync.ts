@@ -27,18 +27,19 @@ export function useDataSync() {
 
     if (user?.id) {
       const uid = user.id;
+      authStore.loadForUser(uid).then(() => {
+        // Read token AFTER auth has finished loading — avoids null race condition
+        const token = useAuthStore.getState().canvasToken;
+        canvasStore.loadForUser(uid, token);
+      });
       Promise.all([
-        authStore.loadForUser(uid),
         notesStore.loadForUser(uid),
         tasksStore.loadForUser(uid),
         focusStore.loadForUser(uid),
         settingsStore.loadForUser(uid),
         studyBuddyStore.loadForUser(uid),
         teamsStore.loadForUser(uid),
-      ]).then(() => {
-        const token = authStore.canvasToken;
-        canvasStore.loadForUser(uid, token);
-      });
+      ]);
     } else {
       authStore.resetAppState();
       notesStore.clear();
