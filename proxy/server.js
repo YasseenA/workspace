@@ -90,26 +90,42 @@ const server = http.createServer((req, res) => {
   if (path.startsWith('/ical')) {
     // Fetch any iCal feed URL — used for schools that block personal access tokens
     const params = new URLSearchParams((path.split('?')[1] || ''));
-    const icalUrl = params.get('url');
-    if (!icalUrl) { res.writeHead(400); res.end('Missing url param'); return; }
-    try {
-      const parsed = new URL(icalUrl);
-      const proto = parsed.protocol === 'https:' ? https : http;
-      const proxyReq = proto.request({
-        hostname: parsed.hostname,
-        path: parsed.pathname + parsed.search,
-        method: 'GET',
-        headers: { 'User-Agent': 'Workspace/1.0 Calendar Client' },
-      }, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode, {
-          'Content-Type': proxyRes.headers['content-type'] || 'text/calendar',
-          'Access-Control-Allow-Origin': '*',
+    const rawUrl = params.get('url');
+    if (!rawUrl) { res.writeHead(400); res.end('Missing url param'); return; }
+    // Normalise webcal:// → https://
+    const icalUrl = rawUrl.replace(/^webcal:\/\//i, 'https://');
+
+    function fetchIcal(targetUrl, redirectsLeft) {
+      try {
+        const parsed = new URL(targetUrl);
+        const proto = parsed.protocol === 'https:' ? https : http;
+        const proxyReq = proto.request({
+          hostname: parsed.hostname,
+          path: parsed.pathname + parsed.search,
+          method: 'GET',
+          headers: { 'User-Agent': 'Workspace/1.0 Calendar Client', 'Accept': 'text/calendar,*/*' },
+        }, (proxyRes) => {
+          // Follow redirects
+          if ((proxyRes.statusCode === 301 || proxyRes.statusCode === 302 || proxyRes.statusCode === 307) && proxyRes.headers.location && redirectsLeft > 0) {
+            proxyRes.resume();
+            const next = proxyRes.headers.location.startsWith('http')
+              ? proxyRes.headers.location
+              : `${parsed.protocol}//${parsed.hostname}${proxyRes.headers.location}`;
+            fetchIcal(next, redirectsLeft - 1);
+            return;
+          }
+          res.writeHead(proxyRes.statusCode, {
+            'Content-Type': proxyRes.headers['content-type'] || 'text/calendar',
+            'Access-Control-Allow-Origin': '*',
+          });
+          proxyRes.pipe(res);
         });
-        proxyRes.pipe(res);
-      });
-      proxyReq.on('error', (e) => { res.writeHead(502); res.end(e.message); });
-      proxyReq.end();
-    } catch (e) { res.writeHead(400); res.end('Invalid URL'); }
+        proxyReq.on('error', (e) => { if (!res.headersSent) { res.writeHead(502); res.end(e.message); } });
+        proxyReq.end();
+      } catch (e) { if (!res.headersSent) { res.writeHead(400); res.end('Invalid URL'); } }
+    }
+
+    fetchIcal(icalUrl, 5);
     return;
   } else if (path.startsWith('/claude')) {
     const apiPath = '/v1' + path.replace('/claude', '');

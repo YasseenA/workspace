@@ -90,13 +90,21 @@ export function parseICal(icsText: string): { assignments: CanvasAssignment[]; c
 }
 
 export async function fetchAndParseICal(feedUrl: string): Promise<{ assignments: CanvasAssignment[]; courses: CanvasCourse[] }> {
-  const url = Platform.OS === 'web'
-    ? `${PROXY}/ical?url=${encodeURIComponent(feedUrl)}`
-    : feedUrl;
+  // webcal:// is identical to https:// — browsers/proxies need the swap
+  const normalizedUrl = feedUrl.trim().replace(/^webcal:\/\//i, 'https://');
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Could not fetch your calendar feed. Make sure the URL is correct.');
+  const url = Platform.OS === 'web'
+    ? `${PROXY}/ical?url=${encodeURIComponent(normalizedUrl)}`
+    : normalizedUrl;
+
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (e: any) {
+    throw new Error('Could not reach the calendar server. Check your internet connection and try again.');
+  }
+  if (!res.ok) throw new Error(`Could not fetch your calendar feed (${res.status}). Make sure the URL is correct.`);
   const text = await res.text();
-  if (!text.includes('BEGIN:VCALENDAR')) throw new Error('That doesn\'t look like a valid Canvas calendar feed URL.');
+  if (!text.includes('BEGIN:VCALENDAR')) throw new Error('That doesn\'t look like a valid Canvas calendar feed URL. Copy it directly from Canvas → Calendar → calendar feed icon.');
   return parseICal(text);
 }
