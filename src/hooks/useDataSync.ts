@@ -27,11 +27,8 @@ export function useDataSync() {
 
     if (user?.id) {
       const uid = user.id;
-      authStore.loadForUser(uid).then(() => {
-        // Read token AFTER auth has finished loading — avoids null race condition
-        const token = useAuthStore.getState().canvasToken;
-        canvasStore.loadForUser(uid, token);
-      });
+      authStore.loadForUser(uid);
+      canvasStore.loadForUser(uid);
       Promise.all([
         notesStore.loadForUser(uid),
         tasksStore.loadForUser(uid),

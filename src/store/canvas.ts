@@ -9,7 +9,7 @@ interface CanvasState {
   submissions: CanvasSubmission[];
   lastSync: string | null; isSyncing: boolean; error: string | null;
   userId: string | null;
-  loadForUser: (userId: string, token?: string | null) => Promise<void>;
+  loadForUser: (userId: string) => Promise<void>;
   connect: (token: string) => Promise<void>;
   connectICal: (feedUrl: string) => Promise<void>;
   disconnect: () => void;
@@ -21,15 +21,25 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   connected: false, token: null, icalUrl: null, courses: [], assignments: [],
   submissions: [], lastSync: null, isSyncing: false, error: null, userId: null,
 
-  loadForUser: async (userId, token) => {
+  loadForUser: async (userId) => {
     set({ userId });
-    if (!token) return;
     const { data } = await supabase.from('profiles')
       .select('canvas_token,canvas_courses,canvas_assignments,canvas_submissions,canvas_last_sync')
       .eq('user_id', userId).single();
-    if (data?.canvas_token) {
+    if (!data?.canvas_token) return;
+    // ical:: prefix means the user connected via calendar feed, not API token
+    if (data.canvas_token.startsWith('ical::')) {
+      const icalUrl = data.canvas_token.slice(6);
       set({
-        connected: true, token: data.canvas_token,
+        connected: true, icalUrl, token: null,
+        courses: data.canvas_courses || [],
+        assignments: data.canvas_assignments || [],
+        submissions: [],
+        lastSync: data.canvas_last_sync || null,
+      });
+    } else {
+      set({
+        connected: true, token: data.canvas_token, icalUrl: null,
         courses: data.canvas_courses || [],
         assignments: data.canvas_assignments || [],
         submissions: data.canvas_submissions || [],
@@ -74,7 +84,7 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       const now = new Date().toISOString();
       set({ connected: true, icalUrl: feedUrl, token: null, courses, assignments, submissions: [], lastSync: now, isSyncing: false });
       if (userId) await supabase.from('profiles').update({
-        canvas_token: null,
+        canvas_token: `ical::${feedUrl}`,
         canvas_courses: courses,
         canvas_assignments: assignments,
         canvas_submissions: [],
