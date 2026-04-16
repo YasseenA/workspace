@@ -69,13 +69,6 @@ export default function HomeScreen() {
     catch { return false; }
   });
   const subMap    = React.useMemo(() => new Map(submissions.map(s => [s.assignment_id, s])), [submissions]);
-  // Navigate to Canvas with tour guide if not connected after onboarding
-  useEffect(() => {
-    if (hasOnboarded && !canvasConnected) {
-      const timer = setTimeout(() => router.push('/canvas?tour=1'), 1400);
-      return () => clearTimeout(timer);
-    }
-  }, [hasOnboarded, canvasConnected]);
 
   const [briefText,    setBriefText]    = useState('');
   const [briefLoading, setBriefLoading] = useState(false);
