@@ -2,10 +2,16 @@
  * Web Notification API wrapper.
  * Fires "due soon" reminders at two windows: ~24h and ~3h before due.
  * Supports Canvas assignments, Teams assignments, and tasks.
+ *
+ * On native (iOS/Android) all functions are no-ops — push notifications
+ * via expo-notifications will be wired up separately.
  */
+import { Platform } from 'react-native';
 
 const NOTIFIED_KEY = 'notified_ids_v2';
 const ICON = '/icon-192.png';
+
+const IS_WEB = Platform.OS === 'web';
 
 function loadNotified(): Set<string> {
   try {
@@ -22,6 +28,7 @@ function saveNotified(set: Set<string>) {
 }
 
 export async function requestPermission(): Promise<NotificationPermission> {
+  if (!IS_WEB) return 'denied';
   if (typeof Notification === 'undefined') return 'denied';
   if (Notification.permission === 'granted') return 'granted';
   if (Notification.permission === 'denied')  return 'denied';
@@ -29,6 +36,7 @@ export async function requestPermission(): Promise<NotificationPermission> {
 }
 
 export function canNotify(): boolean {
+  if (!IS_WEB) return false;
   return typeof Notification !== 'undefined' && Notification.permission === 'granted';
 }
 

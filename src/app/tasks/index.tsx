@@ -3,14 +3,15 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   Modal, TextInput, StyleSheet, Platform, ActivityIndicator,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Plus, CheckCircle, Circle, Trash2,
   Flag, X, BookOpen, ExternalLink, Calendar,
-  Clock, ChevronRight, AlertCircle, Timer,
+  Clock, ChevronRight, AlertCircle, Timer, ChevronDown,
 } from 'lucide-react-native';
-import { useTasksStore, Priority, Task } from '../../store/tasks';
+import { useTasksStore, Priority, Task, Subtask } from '../../store/tasks';
 import { useCanvasStore } from '../../store/canvas';
 import { useFocusStore } from '../../store/focus';
 import { CanvasAssignment } from '../../lib/canvas';
@@ -43,12 +44,16 @@ type TaskRowProps = {
   onRestore:   (id: string) => void;
   onDelete:    (task: Task) => void;
   onFocus:     (task: Task) => void;
+  onUpdate:    (id: string, data: Partial<Task>) => void;
 };
-function TaskRow({ item, colors, activeFocusId, onComplete, onRestore, onDelete, onFocus }: TaskRowProps) {
+function TaskRow({ item, colors, activeFocusId, onComplete, onRestore, onDelete, onFocus, onUpdate }: TaskRowProps) {
   const due      = item.dueDate ? fmt.dueDate(item.dueDate) : null;
   const done     = item.status === 'done';
   const pc       = priorityColor(item.priority);
   const isFocused = activeFocusId === item.id;
+  const [showSubs, setShowSubs] = useState(false);
+  const hasSubs = item.subtasks && item.subtasks.length > 0;
+  const doneSubs = hasSubs ? item.subtasks.filter(s => s.done).length : 0;
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: isFocused ? colors.primary : colors.border }]}>
       {/* Priority bar */}
@@ -90,7 +95,40 @@ function TaskRow({ item, colors, activeFocusId, onComplete, onRestore, onDelete,
               <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>FOCUSING</Text>
             </View>
           )}
+          {hasSubs && (
+            <TouchableOpacity
+              onPress={() => setShowSubs(v => !v)}
+              style={{ flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: colors.bg, borderWidth: 0.5, borderColor: colors.border }}
+            >
+              <Text style={{ fontSize: 10, fontWeight: '700', color: doneSubs === item.subtasks.length ? colors.success : colors.textSecondary }}>
+                {doneSubs}/{item.subtasks.length}
+              </Text>
+              <ChevronDown size={9} color={colors.textTertiary} style={showSubs ? { transform: [{ rotate: '180deg' }] } : {}} />
+            </TouchableOpacity>
+          )}
         </View>
+        {/* Inline subtask list */}
+        {hasSubs && showSubs && (
+          <View style={{ marginTop: 10, gap: 6, paddingLeft: 2 }}>
+            {item.subtasks.map(st => (
+              <TouchableOpacity
+                key={st.id}
+                onPress={() => {
+                  const updated = item.subtasks.map(s => s.id === st.id ? { ...s, done: !s.done } : s);
+                  onUpdate(item.id, { subtasks: updated });
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                {st.done
+                  ? <CheckCircle size={15} color={colors.success} fill={colors.success + '25'} />
+                  : <Circle      size={15} color={colors.border} />}
+                <Text style={{ fontSize: 13, color: colors.textSecondary, textDecorationLine: st.done ? 'line-through' : 'none', opacity: st.done ? 0.5 : 1, flex: 1 }}>
+                  {st.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
       {!done && (
         <TouchableOpacity
@@ -105,6 +143,39 @@ function TaskRow({ item, colors, activeFocusId, onComplete, onRestore, onDelete,
         <Trash2 size={15} color={colors.textTertiary} />
       </TouchableOpacity>
     </View>
+  );
+}
+
+/* ── SwipeableTaskRow — wraps TaskRow with swipe-to-complete / swipe-to-delete on native ── */
+function SwipeableTaskRow(props: TaskRowProps) {
+  const swipeRef = React.useRef<Swipeable>(null);
+  if (Platform.OS === 'web') return <TaskRow {...props} />;
+  const isDone = props.item.status === 'done';
+  return (
+    <Swipeable
+      ref={swipeRef}
+      renderLeftActions={!isDone ? () => (
+        <View style={{ backgroundColor: props.colors.success, borderRadius: 18, marginBottom: 10, justifyContent: 'center', paddingHorizontal: 22, minWidth: 80 }}>
+          <CheckCircle size={22} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginTop: 3 }}>Done</Text>
+        </View>
+      ) : undefined}
+      renderRightActions={() => (
+        <View style={{ backgroundColor: props.colors.error, borderRadius: 18, marginBottom: 10, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 22, minWidth: 80 }}>
+          <Trash2 size={22} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginTop: 3 }}>Delete</Text>
+        </View>
+      )}
+      onSwipeableOpen={(direction) => {
+        if (direction === 'left' && !isDone) props.onComplete(props.item.id);
+        else if (direction === 'right') props.onDelete(props.item);
+        swipeRef.current?.close();
+      }}
+      overshootLeft={false}
+      overshootRight={false}
+    >
+      <TaskRow {...props} />
+    </Swipeable>
   );
 }
 
@@ -323,6 +394,7 @@ export default function TasksScreen() {
   const router = useRouter();
   const colors = useColors();
   const { tasks, createTask, completeTask, deleteTask, updateTask } = useTasksStore();
+  const [newSubtasks, setNewSubtasks] = useState<Subtask[]>([]);
   const { assignments, submissions, connected: canvasConnected, courses } = useCanvasStore();
   const { focusTaskId, setFocusTask } = useFocusStore();
   const [filter,      setFilter]      = useState<Filter>('week');
@@ -383,8 +455,8 @@ export default function TasksScreen() {
     if (!newTitle.trim()) { showAlert('Title required'); return; }
     setSaving(true);
     try {
-      createTask({ title: newTitle.trim(), description: newDesc.trim() || undefined, priority: newPriority, dueDate: newDue || undefined });
-      setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewDue('');
+      createTask({ title: newTitle.trim(), description: newDesc.trim() || undefined, priority: newPriority, dueDate: newDue || undefined, subtasks: newSubtasks.filter(s => s.title.trim()) });
+      setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewDue(''); setNewSubtasks([]);
       setShowAdd(false);
     } finally { setSaving(false); }
   };
@@ -483,7 +555,7 @@ export default function TasksScreen() {
           </View>
         )}
         {filteredTasks.map(item => (
-          <TaskRow
+          <SwipeableTaskRow
             key={item.id}
             item={item}
             colors={colors}
@@ -492,6 +564,7 @@ export default function TasksScreen() {
             onRestore={id => updateTask(id, { status: 'todo' })}
             onDelete={handleDelete}
             onFocus={handleFocus}
+            onUpdate={updateTask}
           />
         ))}
 
@@ -576,6 +649,31 @@ export default function TasksScreen() {
               onChangeText={setNewDue}
             />
           )}
+
+          {/* Subtasks */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>Subtasks</Text>
+          {newSubtasks.map((st, i) => (
+            <View key={st.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0, paddingVertical: 8, fontSize: 14, borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]}
+                placeholder={`Subtask ${i + 1}`}
+                placeholderTextColor={colors.textTertiary}
+                value={st.title}
+                onChangeText={t => setNewSubtasks(prev => prev.map(s => s.id === st.id ? { ...s, title: t } : s))}
+              />
+              <TouchableOpacity onPress={() => setNewSubtasks(prev => prev.filter(s => s.id !== st.id))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity
+            onPress={() => setNewSubtasks(prev => [...prev, { id: 's' + Date.now(), title: '', done: false }])}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, marginBottom: 16 }}
+          >
+            <Plus size={14} color={colors.primary} />
+            <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Add subtask</Text>
+          </TouchableOpacity>
 
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 10 }}>Priority</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>

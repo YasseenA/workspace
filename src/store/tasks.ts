@@ -4,10 +4,14 @@ import { supabase } from '../lib/supabase';
 export type Priority = 'low' | 'medium' | 'high' | 'critical';
 export type Status   = 'todo' | 'in_progress' | 'done';
 
+export interface Subtask {
+  id: string; title: string; done: boolean;
+}
+
 export interface Task {
   id: string; title: string; description?: string; priority: Priority;
   status: Status; dueDate?: string; classId?: string; canvasId?: string;
-  tags: string[]; createdAt: string; updatedAt: string;
+  tags: string[]; subtasks: Subtask[]; createdAt: string; updatedAt: string;
 }
 
 interface TasksState {
@@ -26,7 +30,8 @@ function fromDB(row: any): Task {
     id: row.id, title: row.title, description: row.description,
     priority: row.priority, status: row.status,
     dueDate: row.due_date, canvasId: row.canvas_id,
-    tags: row.tags || [], createdAt: row.created_at, updatedAt: row.updated_at,
+    tags: row.tags || [], subtasks: row.subtasks || [],
+    createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
 
@@ -45,13 +50,14 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
       id: 't' + Date.now(), title: data.title || 'New Task',
       description: data.description, priority: data.priority || 'medium',
       status: 'todo', dueDate: data.dueDate, canvasId: data.canvasId,
-      tags: data.tags || [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      tags: data.tags || [], subtasks: data.subtasks || [],
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     set(s => ({ tasks: [task, ...s.tasks] }));
     if (userId) supabase.from('tasks').insert({
       id: task.id, user_id: userId, title: task.title, description: task.description,
       priority: task.priority, status: task.status, due_date: task.dueDate || null,
-      canvas_id: task.canvasId || null, tags: task.tags,
+      canvas_id: task.canvasId || null, tags: task.tags, subtasks: task.subtasks,
       created_at: task.createdAt, updated_at: task.updatedAt,
     }).then();
     return task;
@@ -68,6 +74,7 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
       if (data.status !== undefined)      patch.status      = data.status;
       if (data.dueDate !== undefined)     patch.due_date    = data.dueDate || null;
       if (data.tags !== undefined)        patch.tags        = data.tags;
+      if (data.subtasks !== undefined)    patch.subtasks    = data.subtasks;
       supabase.from('tasks').update(patch).eq('id', id).eq('user_id', userId).then();
     }
   },

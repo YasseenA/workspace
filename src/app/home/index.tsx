@@ -23,25 +23,30 @@ import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { claude } from '../../lib/claude';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fmt, priorityColor, initials } from '../../utils/helpers';
 import AssignmentDetailSheet, { SheetItem } from '../../components/AssignmentDetailSheet';
 
 const BRIEF_CACHE_KEY = 'home_daily_brief';
 const BRIEF_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
-function loadBriefCache(): { text: string; ts: number } | null {
+async function loadBriefCache(): Promise<{ text: string; ts: number } | null> {
   try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(BRIEF_CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const raw = Platform.OS === 'web'
+      ? (typeof localStorage !== 'undefined' ? localStorage.getItem(BRIEF_CACHE_KEY) : null)
+      : await AsyncStorage.getItem(BRIEF_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
-function saveBriefCache(text: string) {
+async function saveBriefCache(text: string) {
+  const data = JSON.stringify({ text, ts: Date.now() });
   try {
-    if (typeof localStorage !== 'undefined')
-      localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ text, ts: Date.now() }));
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(BRIEF_CACHE_KEY, data);
+    } else {
+      await AsyncStorage.setItem(BRIEF_CACHE_KEY, data);
+    }
   } catch {}
 }
 
@@ -51,7 +56,7 @@ export default function HomeScreen() {
   const { user } = useUser();
   const { notes } = useNotesStore();
   const { tasks, completeTask } = useTasksStore();
-  const { totalFocusMinutes } = useFocusStore();
+  const { totalFocusMinutes, streak } = useFocusStore();
   const { assignments, courses, submissions, connected: canvasConnected } = useCanvasStore();
   const { assignments: teamsAssignments } = useTeamsStore();
   const { hasOnboarded } = useAuthStore();
@@ -85,13 +90,13 @@ export default function HomeScreen() {
   const loadBrief = async (force = false) => {
     if (briefLoading) return;
     if (!force) {
-      const cached = loadBriefCache();
+      const cached = await loadBriefCache();
       if (cached && Date.now() - cached.ts < BRIEF_TTL_MS) {
         setBriefText(cached.text);
         return;
       }
     } else {
-      saveBriefCache(''); // invalidate
+      await saveBriefCache(''); // invalidate
     }
     setBriefText('');
     setBriefLoading(true);
@@ -114,7 +119,7 @@ export default function HomeScreen() {
         full += chunk;
         setBriefText(full);
       });
-      saveBriefCache(full);
+      await saveBriefCache(full);
     } catch {
       setBriefText('');
     } finally {
@@ -252,9 +257,9 @@ export default function HomeScreen() {
           {/* Mini stats inside hero */}
           <View style={styles.heroStats}>
             {[
-              { value: notes.length,                              label: 'Notes',    icon: '📝' },
+              { value: notes.length,                              label: 'Notes',     icon: '📝' },
               { value: totalDue,                                  label: 'Due today', icon: '📋' },
-              { value: Math.round(totalFocusMinutes / 60 * 10) / 10, label: 'Focus hrs', icon: '⏱' },
+              { value: streak,                                    label: 'Day streak', icon: '🔥' },
             ].map((s, i) => (
               <View key={i} style={[styles.heroStat, i < 2 && styles.heroStatBorder]}>
                 <Text style={styles.heroStatValue}>{s.value}</Text>

@@ -16,6 +16,7 @@ import { useTeamsStore }  from '../../store/teams';
 import { useColors } from '../../lib/theme';
 import TopBar from '../../components/layout/TopBar';
 import { fmt } from '../../utils/helpers';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ResultKind = 'note' | 'task' | 'assignment' | 'teams';
 
@@ -30,28 +31,35 @@ interface SearchResult {
 const RECENT_KEY = 'search_recent';
 const MAX_RECENT = 8;
 
-function loadRecent(): string[] {
+async function loadRecent(): Promise<string[]> {
   try {
-    if (typeof localStorage === 'undefined') return [];
-    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    const raw = Platform.OS === 'web'
+      ? (typeof localStorage !== 'undefined' ? localStorage.getItem(RECENT_KEY) : null)
+      : await AsyncStorage.getItem(RECENT_KEY);
+    return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
-function saveRecent(query: string, prev: string[]) {
-  const updated = [query, ...prev.filter(q => q !== query)].slice(0, MAX_RECENT);
+async function persistRecent(list: string[]) {
+  const data = JSON.stringify(list);
   try {
-    if (typeof localStorage !== 'undefined')
-      localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(RECENT_KEY, data);
+    } else {
+      await AsyncStorage.setItem(RECENT_KEY, data);
+    }
   } catch {}
+}
+
+async function saveRecent(query: string, prev: string[]): Promise<string[]> {
+  const updated = [query, ...prev.filter(q => q !== query)].slice(0, MAX_RECENT);
+  await persistRecent(updated);
   return updated;
 }
 
-function removeRecent(query: string, prev: string[]): string[] {
+async function removeRecent(query: string, prev: string[]): Promise<string[]> {
   const updated = prev.filter(q => q !== query);
-  try {
-    if (typeof localStorage !== 'undefined')
-      localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
-  } catch {}
+  await persistRecent(updated);
   return updated;
 }
 
@@ -91,8 +99,10 @@ export default function SearchScreen() {
   const { assignments: teamsAssignments, connected: teamsConnected } = useTeamsStore();
 
   const [query,   setQuery]   = useState('');
-  const [recent,  setRecent]  = useState<string[]>(() => loadRecent());
+  const [recent,  setRecent]  = useState<string[]>([]);
   const [activeKind, setActiveKind] = useState<ResultKind | null>(null);
+
+  useEffect(() => { loadRecent().then(setRecent); }, []);
 
   const inputRef = useRef<any>(null);
 
@@ -185,12 +195,12 @@ export default function SearchScreen() {
   const handleSubmit = () => {
     const q = query.trim();
     if (!q) return;
-    setRecent(prev => saveRecent(q, prev));
+    saveRecent(q, recent).then(setRecent);
   };
 
   const handleResultPress = (item: SearchResult) => {
     const q = query.trim();
-    if (q) setRecent(prev => saveRecent(q, prev));
+    if (q) saveRecent(q, recent).then(setRecent);
     if (item.kind === 'note') {
       router.push({ pathname: '/notes/editor', params: { id: item.id } });
     } else if (item.kind === 'task') {
@@ -280,7 +290,7 @@ export default function SearchScreen() {
                     <Text style={{ fontSize: 14, color: colors.text }}>{q}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => setRecent(prev => removeRecent(q, prev))}
+                    onPress={() => removeRecent(q, recent).then(setRecent)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <X size={14} color={colors.textTertiary} />

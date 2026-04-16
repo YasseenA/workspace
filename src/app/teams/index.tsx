@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle, RefreshCw, AlertCircle, BookOpen, X } from 'lucide-react-native';
 import { useTeamsStore } from '../../store/teams';
 import { getLoginUrl } from '../../lib/teams';
+import { showAlert } from '../../utils/helpers';
 import { useTasksStore } from '../../store/tasks';
 import { Badge, Button } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
@@ -25,6 +26,10 @@ export default function TeamsScreen() {
     .sort((a, b) => new Date(a.dueDateTime || '').getTime() - new Date(b.dueDateTime || '').getTime());
 
   const handleSignIn = async () => {
+    if (Platform.OS !== 'web') {
+      showAlert('Teams on iOS', 'Microsoft Teams connection requires the web app. Visit workspace-edu.com to connect.');
+      return;
+    }
     const url = await getLoginUrl();
     window.location.href = url;
   };
@@ -32,7 +37,10 @@ export default function TeamsScreen() {
   const handleSync = async () => { try { await sync(); } catch {} };
 
   const handleDisconnect = () => {
-    if (Platform.OS === 'web' && window.confirm('Disconnect from Microsoft Teams?')) disconnect();
+    showAlert('Disconnect Teams', 'Disconnect from Microsoft Teams?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Disconnect', style: 'destructive', onPress: disconnect },
+    ]);
   };
 
   return (

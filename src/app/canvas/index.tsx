@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link2, RefreshCw, CheckCircle, BookOpen, X, Download, ExternalLink, AlertCircle } from 'lucide-react-native';
 import { useCanvasStore } from '../../store/canvas';
@@ -9,7 +9,7 @@ import { Card, Button, Badge } from '../../components/ui';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
-import { fmt } from '../../utils/helpers';
+import { fmt, showAlert } from '../../utils/helpers';
 import WebViewer from '../../components/ui/WebViewer';
 import AssignmentDetailSheet, { SheetItem } from '../../components/AssignmentDetailSheet';
 
@@ -63,12 +63,15 @@ export default function CanvasScreen() {
     try {
       const count = importFromCanvas(assignments);
       const msg = count > 0 ? `${count} new tasks added!` : 'All assignments already imported.';
-      if (Platform.OS === 'web') window.alert(msg);
+      showAlert('Canvas Import', msg);
     } finally { setImporting(false); }
   };
 
   const handleDisconnect = () => {
-    if (Platform.OS === 'web' && window.confirm('Disconnect from Canvas?')) disconnect();
+    showAlert('Disconnect Canvas', 'Disconnect from Canvas?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Disconnect', style: 'destructive', onPress: disconnect },
+    ]);
   };
 
   const courseForId = (id: number) => courses.find(c => c.id === id);
@@ -137,7 +140,7 @@ export default function CanvasScreen() {
             </View>
 
             <TouchableOpacity style={styles.canvasLink}
-              onPress={() => { if (Platform.OS === 'web') window.open(canvasSettingsUrl, '_blank'); }}>
+              onPress={() => { if (Platform.OS === 'web') window.open(canvasSettingsUrl, '_blank'); else Linking.openURL(canvasSettingsUrl); }}>
               <ExternalLink size={14} color={colors.primary} />
               <Text style={[styles.canvasLinkText, { color: colors.primary }]}>Open Canvas Settings</Text>
             </TouchableOpacity>
@@ -262,7 +265,7 @@ export default function CanvasScreen() {
                             onPress={(e) => {
                               e.stopPropagation?.();
                               if (Platform.OS === 'web') { setViewerTitle(a.name); setViewerUrl(a.html_url); }
-                              else window.open?.(a.html_url, '_blank');
+                              else Linking.openURL(a.html_url);
                             }}
                             style={[styles.viewBtn, { backgroundColor: colors.primaryLight }]}>
                             <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>View</Text>

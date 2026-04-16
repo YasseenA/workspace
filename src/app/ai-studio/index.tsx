@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Copy, Send, RotateCcw, Upload } from 'lucide-react-native';
+import { Zap, Copy, Send, RotateCcw, Upload, BookmarkPlus } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Badge } from '../../components/ui';
+import { useNotesStore } from '../../store/notes';
+import { showAlert } from '../../utils/helpers';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
@@ -83,6 +85,13 @@ function NativeInput({ value, onChange, placeholder, multiline = false, onEnter,
 export default function AIStudioScreen() {
   const colors  = useColors();
   const isWeb   = Platform.OS === 'web';
+  const { createNote } = useNotesStore();
+
+  const saveToNotes = (text: string, toolId: Tool) => {
+    const toolLabel = TOOLS.find(t => t.id === toolId)?.label || 'AI Studio';
+    createNote({ title: `${toolLabel} — ${new Date().toLocaleDateString()}`, content: text });
+    showAlert('Saved', 'Output saved to Notes.');
+  };
 
   const [tool,       setTool]       = useState<Tool>('summarize');
   const [content,    setContent]    = useState('');
@@ -402,9 +411,16 @@ export default function AIStudioScreen() {
                       <Text style={[styles.bubbleLbl, { color: msgColor }]}>Claude</Text>
                       {isStreaming
                         ? <ThinkingDots color={msgColor} />
-                        : <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(m.text); }}>
-                            <Copy size={12} color={colors.textTertiary} />
-                          </TouchableOpacity>
+                        : (
+                          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                            <TouchableOpacity onPress={() => saveToNotes(m.text, tool)}>
+                              <BookmarkPlus size={12} color={colors.textTertiary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={async () => { await Clipboard.setStringAsync(m.text); }}>
+                              <Copy size={12} color={colors.textTertiary} />
+                            </TouchableOpacity>
+                          </View>
+                        )
                       }
                     </View>
                   )}

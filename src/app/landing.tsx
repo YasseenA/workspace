@@ -2,19 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
-import { SignIn, SignUp } from '@clerk/clerk-expo/web';
 import { useAuthStore } from '../store/auth';
 import {
   FileText, CheckSquare, Timer,
   BookOpen, TrendingUp, X, ArrowRight, Sparkles, Zap,
 } from 'lucide-react-native';
 
-/* ── Auth Modal — uses Clerk's pre-built UI ── */
+// Web-only: Clerk's pre-built UI components
+const SignIn = Platform.OS === 'web' ? require('@clerk/clerk-expo/web').SignIn : null;
+const SignUp = Platform.OS === 'web' ? require('@clerk/clerk-expo/web').SignUp : null;
+
+/* ── Auth Modal — Clerk UI on web, navigate to auth screens on native ── */
 function AuthModal({ onClose, defaultTab }: { onClose: () => void; defaultTab: 'in' | 'up' }) {
   const router = useRouter();
   const [tab, setTab] = useState<'in' | 'up'>(defaultTab);
   const { isSignedIn } = useAuth();
   const { hasOnboarded } = useAuthStore();
+
+  // On native: navigate directly to the auth screens instead of showing the modal
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      onClose();
+      router.push(defaultTab === 'in' ? '/auth/login' : '/auth/register');
+    }
+  }, []);
 
   // When Clerk completes sign-in (state change from false → true), redirect
   useEffect(() => {

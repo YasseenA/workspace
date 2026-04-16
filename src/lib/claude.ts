@@ -1,40 +1,52 @@
 import { Platform } from 'react-native';
+import { getKey } from './keystore';
 
 // On web, route through the proxy to bypass CORS.
-// EXPO_PUBLIC_PROXY_URL should be set to your deployed proxy in production.
-// On native (iOS/Android), call the API directly.
+// On native (iOS/Android), call the API directly — no CORS restriction.
 const PROXY = process.env.EXPO_PUBLIC_PROXY_URL || 'https://workspace-production-2fb5.up.railway.app';
-const API = Platform.OS === 'web'
-  ? `${PROXY}/claude/messages`
-  : 'https://api.anthropic.com/v1/messages';
+const CLAUDE_API = Platform.OS === 'web' ? `${PROXY}/claude/messages` : 'https://api.anthropic.com/v1/messages';
+const OPENAI_API = Platform.OS === 'web' ? `${PROXY}/openai/chat/completions` : 'https://api.openai.com/v1/chat/completions';
 
-const MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const OPENAI_MODEL = 'gpt-4o';
+
+function getProvider(): 'claude' | 'openai' {
+  return (getKey('ai_provider') as 'claude' | 'openai') || 'claude';
+}
 
 function getApiKey(): string {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const userKey = localStorage.getItem('user_claude_api_key');
-      if (userKey) return userKey;
-    }
-  } catch {}
-  return process.env.EXPO_PUBLIC_CLAUDE_API_KEY || '';
+  const provider = getProvider();
+  const userKey = getKey(provider === 'openai' ? 'user_openai_api_key' : 'user_claude_api_key');
+  if (userKey) return userKey;
+  return provider === 'claude' ? (process.env.EXPO_PUBLIC_CLAUDE_API_KEY || '') : '';
 }
 
 async function call(system: string, user: string, maxTokens = 2048): Promise<string> {
   const key = getApiKey();
-  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
-  const res = await fetch(API, {
+  if (!key) throw new Error('No AI key set. Go to Settings → AI Keys to add yours.');
+  const provider = getProvider();
+  if (provider === 'openai') {
+    const res = await fetch(OPENAI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: OPENAI_MODEL, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `OpenAI error ${res.status}`); }
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content || '';
+  }
+  const res = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
+    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Claude error ${res.status}`); }
   const d = await res.json();
   return d.content?.[0]?.text || '';
 }
 
-// Parse SSE stream from an already-opened Response
-async function readStream(res: Response, onChunk: (text: string) => void): Promise<string> {
+// Parse SSE stream — handles both Claude and OpenAI formats
+async function readStream(res: Response, onChunk: (text: string) => void, provider: 'claude' | 'openai' = 'claude'): Promise<string> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let fullText = '', buffer = '';
@@ -47,12 +59,17 @@ async function readStream(res: Response, onChunk: (text: string) => void): Promi
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
         try {
           const parsed = JSON.parse(data);
-          if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
-            fullText += parsed.delta.text;
-            onChunk(parsed.delta.text);
+          let text = '';
+          if (provider === 'openai') {
+            text = parsed.choices?.[0]?.delta?.content || '';
+          } else {
+            if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta')
+              text = parsed.delta.text;
           }
+          if (text) { fullText += text; onChunk(text); }
         } catch {}
       }
     }
@@ -67,14 +84,24 @@ export async function streamCall(
   maxTokens = 2048
 ): Promise<string> {
   const key = getApiKey();
-  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
-  const res = await fetch(API, {
+  if (!key) throw new Error('No AI key set. Go to Settings → AI Keys to add yours.');
+  const provider = getProvider();
+  if (provider === 'openai') {
+    const res = await fetch(OPENAI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: OPENAI_MODEL, max_tokens: maxTokens, stream: true, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `OpenAI error ${res.status}`); }
+    return readStream(res, onChunk, 'openai');
+  }
+  const res = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, stream: true, system, messages: [{ role: 'user', content: user }] }),
+    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: maxTokens, stream: true, system, messages: [{ role: 'user', content: user }] }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Claude error ${res.status}`); }
-  return readStream(res, onChunk);
+  return readStream(res, onChunk, 'claude');
 }
 
 export async function streamChat(
@@ -84,14 +111,25 @@ export async function streamChat(
   maxTokens = 2048
 ): Promise<string> {
   const key = getApiKey();
-  if (!key) throw new Error('No Claude API key set. Go to Settings → AI Keys to add yours.');
-  const res = await fetch(API, {
+  if (!key) throw new Error('No AI key set. Go to Settings → AI Keys to add yours.');
+  const provider = getProvider();
+  if (provider === 'openai') {
+    const openaiMessages = [{ role: 'system', content: messages[0]?.content || '' }, ...messages.slice(1)];
+    const res = await fetch(OPENAI_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: OPENAI_MODEL, max_tokens: maxTokens, stream: true, messages: openaiMessages }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `OpenAI error ${res.status}`); }
+    return readStream(res, onChunk, 'openai');
+  }
+  const res = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, stream: true, system, messages }),
+    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: maxTokens, stream: true, system, messages }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Claude error ${res.status}`); }
-  return readStream(res, onChunk);
+  return readStream(res, onChunk, 'claude');
 }
 
 async function callWithImage(system: string, userText: string, imageBase64: string, mediaType: string, maxTokens = 2048): Promise<string> {

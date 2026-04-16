@@ -21,6 +21,7 @@ import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { initials, showAlert } from '../../utils/helpers';
+import { getKey } from '../../lib/keystore';
 import { requestPermission, fireTestNotification } from '../../lib/notifications';
 
 export default function SettingsScreen() {
@@ -175,7 +176,7 @@ export default function SettingsScreen() {
             <Row
               icon={Bot} iconColor="#d946ef"
               label="AI API Keys"
-              value={typeof localStorage !== 'undefined' && localStorage.getItem('user_claude_api_key') ? 'Configured ✓' : 'Not set'}
+              value={getKey('user_claude_api_key') ? 'Configured ✓' : 'Not set'}
               onPress={() => router.push('/settings/ai-keys')}
               last
             />

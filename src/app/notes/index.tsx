@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, FlatList,
-  TouchableOpacity, StyleSheet, Platform, ScrollView, Modal,
+  TouchableOpacity, StyleSheet, Platform, ScrollView, Modal, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -200,6 +200,10 @@ export default function NotesScreen() {
       .replace(/\s+/g, ' ')
       .trim();
     const shareText = `${note.title || 'Untitled'}\n\n${plainText}`;
+    if (Platform.OS !== 'web') {
+      Share.share({ title: note.title || 'Note', message: shareText });
+      return;
+    }
     if (typeof navigator !== 'undefined' && (navigator as any).share) {
       (navigator as any).share({ title: note.title || 'Note', text: shareText }).catch(() => {});
     } else if (typeof navigator !== 'undefined' && navigator.clipboard) {

@@ -15,6 +15,7 @@ const dns   = require('dns');
 const PORT         = parseInt(process.env.PORT || '3001', 10);
 const DEFAULT_CANVAS_HOST = 'bc.instructure.com';
 const CLAUDE_HOST  = 'api.anthropic.com';
+const OPENAI_HOST  = 'api.openai.com';
 
 // Use Google DNS — avoids EAI_AGAIN on some hosts
 const resolver = new dns.Resolver();
@@ -114,6 +115,10 @@ const server = http.createServer((req, res) => {
     const apiPath = '/v1' + path.replace('/claude', '');
     console.log(`[Claude] ${req.method} ${apiPath}`);
     forwardTo(req, res, CLAUDE_HOST, apiPath);
+  } else if (path.startsWith('/openai')) {
+    const apiPath = '/v1' + path.replace('/openai', '');
+    console.log(`[OpenAI] ${req.method} ${apiPath}`);
+    forwardTo(req, res, OPENAI_HOST, apiPath);
   } else {
     // Determine Canvas host: use X-Canvas-Base header if provided, strip https://
     const rawBase = req.headers['x-canvas-base'] || '';

@@ -5,14 +5,29 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "workspace",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0c0c11"
+    },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.workspace.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.workspace.app",
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used for drawing in notes.",
+        "NSPhotoLibraryUsageDescription": "Used to attach images to notes.",
+        "NSMicrophoneUsageDescription": "Used for audio notes."
+      }
     },
     "android": {
       "package": "com.workspace.app",
-      "adaptiveIcon": { "backgroundColor": "#6366f1" }
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0c0c11"
+      }
     },
     "web": {
       "bundler": "metro",

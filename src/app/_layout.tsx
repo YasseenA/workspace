@@ -1,25 +1,41 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettingsStore } from '../store/settings';
 import { useDataSync } from '../hooks/useDataSync';
+import { initKeystore } from '../lib/keystore';
 
 const CLERK_KEY = 'pk_live_Y2xlcmsud29ya3NwYWNlLWVkdS5jb20k';
 
+// Keys managed by the keystore (API keys + provider preference)
+const KEYSTORE_KEYS = ['ai_provider', 'user_claude_api_key', 'user_openai_api_key'];
+
+// Clerk token cache — localStorage on web, AsyncStorage on native
 const tokenCache = {
   async getToken(key: string) {
-    try { return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null; }
-    catch { return null; }
+    if (Platform.OS === 'web') {
+      try { return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null; } catch { return null; }
+    }
+    return AsyncStorage.getItem(key);
   },
   async saveToken(key: string, value: string) {
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem(key, value); } catch {}
+    if (Platform.OS === 'web') {
+      try { if (typeof localStorage !== 'undefined') localStorage.setItem(key, value); } catch {}
+      return;
+    }
+    await AsyncStorage.setItem(key, value);
   },
   async clearToken(key: string) {
-    try { if (typeof localStorage !== 'undefined') localStorage.removeItem(key); } catch {}
+    if (Platform.OS === 'web') {
+      try { if (typeof localStorage !== 'undefined') localStorage.removeItem(key); } catch {}
+      return;
+    }
+    await AsyncStorage.removeItem(key);
   },
 };
 
@@ -28,9 +44,14 @@ function ThemedStatusBar() {
   return <StatusBar style={darkMode ? 'light' : 'dark'} />;
 }
 
-// Inner app — only rendered when signed in
 function AppShell() {
-  useDataSync(); // load all Supabase data when user changes
+  useDataSync();
+
+  // Init keystore once on native so getKey() reads work synchronously throughout the app
+  useEffect(() => {
+    initKeystore(KEYSTORE_KEYS);
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -41,7 +62,6 @@ function AppShell() {
   );
 }
 
-// Auth gate — shows sign-in if not authenticated
 function AuthGate() {
   const { isLoaded, isSignedIn } = useAuth();
 
@@ -54,13 +74,14 @@ function AuthGate() {
   }
 
   if (!isSignedIn) {
-    // Redirect to landing/sign-in page
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="landing" />
+            <Stack.Screen name="auth/login" />
+            <Stack.Screen name="auth/register" />
           </Stack>
           <StatusBar style="dark" />
         </SafeAreaProvider>
@@ -73,7 +94,6 @@ function AuthGate() {
 
 export default function RootLayout() {
   if (!CLERK_KEY) {
-    // Dev fallback — no auth
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
