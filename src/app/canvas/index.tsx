@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Link2, RefreshCw, CheckCircle, BookOpen, X, Download, ExternalLink, AlertCircle } from 'lucide-react-native';
 import { useCanvasStore } from '../../store/canvas';
 import { useTasksStore } from '../../store/tasks';
@@ -14,6 +15,7 @@ import WebViewer from '../../components/ui/WebViewer';
 import AssignmentDetailSheet, { SheetItem } from '../../components/AssignmentDetailSheet';
 
 export default function CanvasScreen() {
+  const router = useRouter();
   const colors = useColors();
   const { connected, icalUrl, courses, assignments, submissions, lastSync, isSyncing, error, connect, connectICal, disconnect, sync } = useCanvasStore();
   const { importFromCanvas, tasks } = useTasksStore();
@@ -323,10 +325,12 @@ export default function CanvasScreen() {
                         <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>{course.course_code}</Text>
                       </View>
                       {currentScore != null ? (
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>{currentGrade ?? `${Math.round(currentScore)}%`}</Text>
-                          <Text style={{ fontSize: 10, color: colors.textTertiary }}>{Math.round(currentScore)}%</Text>
-                        </View>
+                        <TouchableOpacity onPress={() => router.push('/settings/grades')} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>{Math.round(currentScore)}%</Text>
+                          <Text style={{ fontSize: 26, fontWeight: '900', color: gradeColor, letterSpacing: -1 }}>
+                            {currentScore >= 90 ? 'A' : currentScore >= 80 ? 'B' : currentScore >= 70 ? 'C' : 'D'}
+                          </Text>
+                        </TouchableOpacity>
                       ) : (
                         <Badge variant="neutral" size="sm">{courseAssignments.length} tasks</Badge>
                       )}
