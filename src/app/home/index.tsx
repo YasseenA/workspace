@@ -189,12 +189,15 @@ export default function HomeScreen() {
         .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
     : [];
 
+  // Parse date-only strings as local midnight to avoid UTC offset making today look like yesterday
+  const parseDate = (d: string) => new Date(d.includes('T') ? d : d + 'T00:00:00');
+  const todayStr  = now.toISOString().slice(0, 10);
+
   const dueTodayTasks = tasks.filter(t =>
-    t.status !== 'done' && t.dueDate && new Date(t.dueDate).toDateString() === now.toDateString()
+    t.status !== 'done' && t.dueDate && t.dueDate.slice(0, 10) === todayStr
   );
   const overdueTasks  = tasks.filter(t =>
-    t.status !== 'done' && t.dueDate &&
-    new Date(t.dueDate) < now && new Date(t.dueDate).toDateString() !== now.toDateString()
+    t.status !== 'done' && t.dueDate && t.dueDate.slice(0, 10) < todayStr
   );
   const recentNotes   = notes.slice(0, 3);
   const pendingTasks  = tasks.filter(t => t.status !== 'done').slice(0, 4);

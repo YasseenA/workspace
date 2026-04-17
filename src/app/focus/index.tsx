@@ -177,56 +177,25 @@ export default function FocusScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <TopBar />
-      <ScrollView
-        contentContainerStyle={[styles.container, Platform.OS === 'web' && { paddingTop: 54 }]}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        {/* Screen title */}
+
+      {/* Sticky header — title + mode toggle always visible */}
+      <View style={[styles.stickyHeader, { backgroundColor: colors.bg, borderBottomColor: colors.border }, Platform.OS === 'web' && { marginTop: 50 }]}>
         <View style={styles.titleRow}>
           <Text style={[styles.screenTitle, { color: colors.text }]}>Focus</Text>
           <TouchableOpacity
             onPress={() => setShowSettings(!showSettings)}
-            style={[
-              styles.settingsBtn,
-              {
-                backgroundColor: showSettings ? colors.primary : colors.card,
-                borderColor:     showSettings ? colors.primary : colors.border,
-              },
-            ]}
+            style={[styles.settingsBtn, { backgroundColor: showSettings ? colors.primary : colors.card, borderColor: showSettings ? colors.primary : colors.border }]}
           >
             <SlidersHorizontal size={17} color={showSettings ? '#fff' : colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        {/* Active task banner */}
-        {focusTaskTitle && mode === 'work' && (
-          <View style={[styles.taskBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '35' }]}>
-            <Brain size={14} color={colors.primary} />
-            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.primary }} numberOfLines={1}>
-              {focusTaskTitle}
-            </Text>
-            {!running && (
-              <TouchableOpacity
-                onPress={() => setFocusTask(null, null)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <X size={14} color={colors.primary} />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Mode toggle */}
         <View style={[styles.modeRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {(['work', 'break'] as Mode[]).map(m => (
             <TouchableOpacity
               key={m}
               onPress={() => switchMode(m)}
-              style={[
-                styles.modeBtn,
-                mode === m && { backgroundColor: m === 'work' ? colors.primary : colors.success },
-              ]}
+              style={[styles.modeBtn, mode === m && { backgroundColor: m === 'work' ? colors.primary : colors.success }]}
             >
               {m === 'work'
                 ? <Brain  size={14} color={mode === 'work'  ? '#fff' : colors.textSecondary} />
@@ -237,6 +206,27 @@ export default function FocusScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Active task banner */}
+        {focusTaskTitle && mode === 'work' && (
+          <View style={[styles.taskBanner, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '35' }]}>
+            <Brain size={14} color={colors.primary} />
+            <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.primary }} numberOfLines={1}>
+              {focusTaskTitle}
+            </Text>
+            {!running && (
+              <TouchableOpacity onPress={() => setFocusTask(null, null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Timer circle */}
         <View style={styles.timerWrap}>
@@ -245,16 +235,16 @@ export default function FocusScreen() {
               <circle
                 cx="128" cy="128" r={R}
                 fill="none"
-                stroke={colors.border}
-                strokeWidth="8"
+                stroke={ringColor + '30'}
+                strokeWidth="10"
               />
               <circle
                 cx="128" cy="128" r={R}
                 fill="none"
                 stroke={ringColor}
-                strokeWidth="8"
+                strokeWidth="10"
                 strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={dashOffset}
+                strokeDashoffset={running ? dashOffset : circumference}
                 strokeLinecap="round"
                 transform="rotate(-90 128 128)"
                 style={{ transition: 'stroke-dashoffset 0.9s ease' } as any}
@@ -496,7 +486,8 @@ export default function FocusScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:  { alignItems: 'center', padding: 20, paddingTop: 4 },
+  stickyHeader:{ borderBottomWidth: 0.5, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  container:  { alignItems: 'center', padding: 20, paddingTop: 16 },
   titleRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 },
   screenTitle:{ fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   settingsBtn:{ width: 40, height: 40, borderRadius: 13, borderWidth: 0.5, alignItems: 'center', justifyContent: 'center' },
@@ -509,7 +500,7 @@ const styles = StyleSheet.create({
 
   modeRow: {
     flexDirection: 'row', borderRadius: 16, borderWidth: 0.5,
-    padding: 4, marginBottom: 32, width: '100%', maxWidth: 300,
+    padding: 4, width: '100%', maxWidth: 300, alignSelf: 'center',
   },
   modeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
