@@ -5,13 +5,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Play, Pause, RotateCcw, SlidersHorizontal, Coffee, Brain, Flame, Zap, CheckCircle2, X } from 'lucide-react-native';
+import { Play, Pause, RotateCcw, SlidersHorizontal, Coffee, Brain, Flame, Zap, CheckCircle2, X, BarChart2 } from 'lucide-react-native';
 import { useFocusStore } from '../../store/focus';
 import { useTasksStore } from '../../store/tasks';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { showAlert } from '../../utils/helpers';
+function last7Days(): string[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().slice(0, 10);
+  });
+}
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso + 'T12:00:00');
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+}
 
 type Mode = 'work' | 'break';
 
@@ -20,6 +31,7 @@ export default function FocusScreen() {
   const colors = useColors();
   const {
     workMinutes, breakMinutes, sessions, totalFocusMinutes, streak,
+    sessionLog,
     setWorkMinutes, setBreakMinutes, recordSession,
     focusTaskId, focusTaskTitle, setFocusTask,
   } = useFocusStore();
@@ -39,6 +51,7 @@ export default function FocusScreen() {
     setSeconds((mode === 'work' ? workMinutes : breakMinutes) * 60);
     setRunning(false);
   }, [workMinutes, breakMinutes]);
+
 
   useEffect(() => {
     if (running) {
@@ -61,7 +74,7 @@ export default function FocusScreen() {
   const handleTimerEnd = () => {
     if (Platform.OS !== 'web') Vibration.vibrate([500, 200, 500]);
     if (mode === 'work') {
-      recordSession(workMinutes);
+      recordSession(workMinutes, focusTaskTitle || undefined);
       setCompletedSessions(c => c + 1);
 
       // If working on a specific task, offer to mark it done
@@ -413,6 +426,68 @@ export default function FocusScreen() {
           </View>
         )}
 
+        {/* Weekly analytics */}
+        {sessionLog.length > 0 && (() => {
+          const days  = last7Days();
+          const byDay: Record<string, number> = {};
+          const byLabel: Record<string, number> = {};
+          for (const e of sessionLog) {
+            byDay[e.date]   = (byDay[e.date]   || 0) + e.minutes;
+            byLabel[e.label]= (byLabel[e.label] || 0) + e.minutes;
+          }
+          const maxMins = Math.max(...days.map(d => byDay[d] || 0), 1);
+          const topSubjects = Object.entries(byLabel)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4);
+          return (
+            <View style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14 }}>
+                <BarChart2 size={14} color={colors.primary} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>Last 7 Days</Text>
+              </View>
+              {/* Bar chart */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 60, marginBottom: 6 }}>
+                {days.map(d => {
+                  const mins = byDay[d] || 0;
+                  const h    = Math.max(3, (mins / maxMins) * 56);
+                  return (
+                    <View key={d} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: '100%', height: h, borderRadius: 5, backgroundColor: d === days[6] ? colors.primary : colors.primary + '55' }} />
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {days.map(d => (
+                  <View key={d} style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 9, color: colors.textTertiary }}>{dayLabel(d)}</Text>
+                  </View>
+                ))}
+              </View>
+              {/* Subject breakdown */}
+              {topSubjects.length > 0 && (
+                <View style={{ marginTop: 14, gap: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Top Subjects (30 days)</Text>
+                  {topSubjects.map(([label, mins]) => {
+                    const pct = mins / (topSubjects[0][1] || 1);
+                    return (
+                      <View key={label} style={{ gap: 3 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: colors.text, fontWeight: '500' }} numberOfLines={1}>{label}</Text>
+                          <Text style={{ fontSize: 12, color: colors.textTertiary }}>{Math.round(mins / 60 * 10) / 10}h</Text>
+                        </View>
+                        <View style={{ height: 4, borderRadius: 2, backgroundColor: colors.border }}>
+                          <View style={{ height: 4, borderRadius: 2, width: `${pct * 100}%` as any, backgroundColor: colors.primary }} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          );
+        })()}
+
         <View style={{ height: 100 }} />
       </ScrollView>
       <TabBar />
@@ -465,7 +540,9 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontWeight: '800' },
   statLabel: { fontSize: 10 },
 
-  dotsRow:  { alignItems: 'center', gap: 10 },
+  dotsRow:  { alignItems: 'center', gap: 10, marginBottom: 20 },
   dotsLabel:{ fontSize: 12, fontWeight: '500' },
   dot:      { width: 10, height: 10, borderRadius: 5 },
+
+  analyticsCard: { width: '100%', borderRadius: 20, borderWidth: 0.5, padding: 16, marginBottom: 20 },
 });

@@ -8,6 +8,7 @@ import { useSettingsStore }   from '../store/settings';
 import { useStudyBuddyStore } from '../store/studyBuddy';
 import { useCanvasStore }     from '../store/canvas';
 import { useTeamsStore }      from '../store/teams';
+import { useFlashcardsStore } from '../store/flashcards';
 
 // Loads all user data from Supabase when Clerk auth state changes.
 // Call this once in the root layout.
@@ -21,6 +22,7 @@ export function useDataSync() {
   const studyBuddyStore = useStudyBuddyStore();
   const canvasStore     = useCanvasStore();
   const teamsStore      = useTeamsStore();
+  const flashcardsStore = useFlashcardsStore();
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -36,6 +38,7 @@ export function useDataSync() {
         settingsStore.loadForUser(uid),
         studyBuddyStore.loadForUser(uid),
         teamsStore.loadForUser(uid),
+        flashcardsStore.loadForUser(uid),
       ]);
     } else {
       authStore.resetAppState();
@@ -46,6 +49,7 @@ export function useDataSync() {
       studyBuddyStore.clear();
       canvasStore.clear();
       teamsStore.clear();
+      flashcardsStore.clear();
     }
   }, [user?.id, isLoaded]);
 }

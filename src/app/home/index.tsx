@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import {
   FileText, CheckSquare, Zap, Timer,
   Plus, ChevronRight, Clock, BookOpen,
-  Calendar, ArrowRight, MessageCircle, RefreshCw, Search, Mail, X,
+  Calendar, ArrowRight, MessageCircle, RefreshCw, Search, Mail, X, Layers,
 } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
@@ -310,10 +310,11 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
         <View style={styles.qaRow}>
           {[
-            { icon: FileText,    label: 'New Note',  color: colors.primary, bg: colors.primaryLight, route: '/notes/editor' },
-            { icon: CheckSquare, label: 'Add Task',  color: '#10b981',      bg: '#d1fae5',           route: '/tasks' },
-            { icon: Zap,         label: 'AI Studio', color: '#f59e0b',      bg: '#fef3c7',           route: '/ai-studio' },
-            { icon: Timer,       label: 'Focus',     color: '#ec4899',      bg: '#fce7f3',           route: '/focus' },
+            { icon: FileText,    label: 'New Note',   color: colors.primary, bg: colors.primaryLight, route: '/notes/editor' },
+            { icon: CheckSquare, label: 'Add Task',   color: '#10b981',      bg: '#d1fae5',           route: '/tasks' },
+            { icon: Zap,         label: 'AI Studio',  color: '#f59e0b',      bg: '#fef3c7',           route: '/ai-studio' },
+            { icon: Timer,       label: 'Focus',      color: '#ec4899',      bg: '#fce7f3',           route: '/focus' },
+            { icon: Layers,      label: 'Flashcards', color: '#f97316',      bg: '#ffedd5',           route: '/flashcards' },
           ].map(({ icon: Icon, label, color, bg, route }) => (
             <TouchableOpacity
               key={label}

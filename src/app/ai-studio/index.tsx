@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ActivityIndicator, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Zap, Copy, Send, RotateCcw, Upload, BookmarkPlus } from 'lucide-react-native';
+import { Zap, Copy, Send, RotateCcw, Upload, BookmarkPlus, Layers, X, Check } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Badge } from '../../components/ui';
 import { useNotesStore } from '../../store/notes';
+import { useFlashcardsStore } from '../../store/flashcards';
 import { showAlert } from '../../utils/helpers';
 import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
@@ -86,6 +87,10 @@ export default function AIStudioScreen() {
   const colors  = useColors();
   const isWeb   = Platform.OS === 'web';
   const { createNote } = useNotesStore();
+  const { createDeck } = useFlashcardsStore();
+
+  const [saveDeckModal, setSaveDeckModal] = useState(false);
+  const [deckName, setDeckName]           = useState('');
 
   const saveToNotes = (text: string, toolId: Tool) => {
     const toolLabel = TOOLS.find(t => t.id === toolId)?.label || 'AI Studio';
@@ -432,6 +437,16 @@ export default function AIStudioScreen() {
               );
             })}
 
+            {flashcards.length > 0 && (
+              <TouchableOpacity
+                onPress={() => { setDeckName(`Flashcards — ${new Date().toLocaleDateString()}`); setSaveDeckModal(true); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#f9731618', borderWidth: 1, borderColor: '#f97316' }}
+              >
+                <Layers size={12} color="#f97316" />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#f97316' }}>Save as Deck</Text>
+              </TouchableOpacity>
+            )}
+
             {flashcards.map((card, i) => (
               <TouchableOpacity
                 key={i}
@@ -661,6 +676,41 @@ export default function AIStudioScreen() {
       </View>
 
       <TabBar />
+
+      {/* Save as Deck modal */}
+      <Modal visible={saveDeckModal} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <View style={{ width: '100%', maxWidth: 400, backgroundColor: colors.card, borderRadius: 20, padding: 20, borderWidth: 0.5, borderColor: colors.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>Save as Flashcard Deck</Text>
+              <TouchableOpacity onPress={() => setSaveDeckModal(false)}>
+                <X size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              value={deckName}
+              onChangeText={setDeckName}
+              placeholder="Deck name…"
+              placeholderTextColor={colors.textTertiary}
+              style={{ borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, color: colors.text, borderColor: colors.border, backgroundColor: colors.bg, marginBottom: 12 }}
+              autoFocus
+            />
+            <TouchableOpacity
+              onPress={async () => {
+                if (!deckName.trim()) return;
+                await createDeck(deckName.trim(), flashcards.map(c => ({ front: c.front, back: c.back })));
+                setSaveDeckModal(false);
+                showAlert('Deck Saved', `"${deckName.trim()}" saved to Flashcards.`);
+              }}
+              disabled={!deckName.trim()}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, borderRadius: 12, backgroundColor: deckName.trim() ? '#f97316' : colors.border }}
+            >
+              <Check size={15} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Save Deck</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
