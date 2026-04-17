@@ -145,7 +145,7 @@ export default function SettingsScreen() {
 
           <Section title="ACCOUNT">
             <Row icon={User}   iconColor={colors.primary} label="Edit Profile"       onPress={() => router.push('/settings/profile')} />
-            <Row icon={Shield} iconColor="#8b5cf6"         label="Privacy & Security" onPress={() => showAlert('Coming soon')} last />
+            <Row icon={Shield} iconColor="#8b5cf6"         label="Privacy & Security" onPress={() => router.push('/settings/privacy')} last />
           </Section>
 
           <Section title="INTEGRATIONS">
