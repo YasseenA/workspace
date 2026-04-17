@@ -446,7 +446,7 @@ export default function NoteEditorScreen() {
     const dataUrl = canvasRef.current.toDataURL('image/png');
     if (IS_WEB && contentRef.current) {
       // Insert as small clickable thumbnail — click to enlarge via lightbox
-      const imgTag = `<img src="${dataUrl}" alt="Drawing" style="width:120px;height:88px;object-fit:cover;border-radius:10px;border:1px solid ${colors.border};cursor:pointer;display:inline-block;margin:0 8px 8px 0" />`;
+      const imgTag = `<img src="${dataUrl}" alt="Drawing" style="width:110px;height:82px;object-fit:cover;border-radius:10px;border:1.5px solid ${colors.border};cursor:pointer;display:inline-block;margin:4px 8px 4px 0;vertical-align:top;transition:transform 0.15s" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'" title="Click to enlarge" />`;
       contentRef.current.innerHTML = imgTag + contentRef.current.innerHTML;
       setContent(contentRef.current.innerHTML);
     } else {
@@ -879,21 +879,31 @@ ${html}
               />
             )}
 
-            {/* Inserted drawings */}
+            {/* Inserted drawings — shown as thumbnails, tap to enlarge */}
             {images.length > 0 && (
-              <View style={{ gap: 12, marginTop: 16 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
                 {images.map((src, i) => (
                   <View key={i} style={{ position: 'relative' }}>
-                    {IS_WEB && (
-                      // @ts-ignore
-                      <img src={src} alt={`Drawing ${i + 1}`}
-                        style={{ width: '100%', borderRadius: 12, display: 'block', border: `1px solid ${colors.border}` } as any} />
-                    )}
+                    <TouchableOpacity
+                      onPress={() => setLightboxImg(src)}
+                      activeOpacity={0.85}
+                      style={{
+                        width: 110, height: 82, borderRadius: 10,
+                        overflow: 'hidden',
+                        borderWidth: 1, borderColor: colors.border,
+                      }}
+                    >
+                      {IS_WEB && (
+                        // @ts-ignore
+                        <img src={src} alt={`Drawing ${i + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' } as any} />
+                      )}
+                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
                       style={[styles.imgDeleteBtn, { backgroundColor: colors.error }]}
                     >
-                      <Trash2 size={12} color="#fff" />
+                      <Trash2 size={10} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -1115,5 +1125,5 @@ const styles = StyleSheet.create({
   drawIconBtn:     { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   colorPickerPanel:{ position: 'absolute' as any, top: 57, left: 0, right: 0, zIndex: 100, padding: 14, borderBottomWidth: 1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8 },
   insertBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  imgDeleteBtn:    { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  imgDeleteBtn:    { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 });
