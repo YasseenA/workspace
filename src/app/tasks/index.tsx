@@ -1,15 +1,14 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  Modal, TextInput, StyleSheet, Platform, ActivityIndicator,
+  Modal, TextInput, StyleSheet, Platform,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Plus, CheckCircle, Circle, Trash2,
-  Flag, X, BookOpen, ExternalLink, Calendar,
-  Clock, ChevronRight, AlertCircle, Timer, ChevronDown,
+  Flag, X, BookOpen, ChevronRight, AlertCircle, Timer, ChevronDown,
 } from 'lucide-react-native';
 import { useTasksStore, Priority, Task, Subtask } from '../../store/tasks';
 import { useCanvasStore } from '../../store/canvas';
@@ -20,7 +19,6 @@ import TabBar from '../../components/layout/TabBar';
 import TopBar from '../../components/layout/TopBar';
 import { useColors } from '../../lib/theme';
 import { fmt, priorityColor, showAlert } from '../../utils/helpers';
-import { claude } from '../../lib/claude';
 
 type Filter = 'week' | 'all' | 'todo' | 'done';
 
@@ -186,8 +184,9 @@ type CanvasRowProps = {
   submissionMap: Map<number, any>;
   courseMap:     Map<number, any>;
   onPress:       (item: CanvasAssignment) => void;
+  onNavigate:    (id: number) => void;
 };
-function CanvasRow({ item, colors, submissionMap, courseMap, onPress }: CanvasRowProps) {
+function CanvasRow({ item, colors, submissionMap, courseMap, onNavigate }: CanvasRowProps) {
   const sub         = submissionMap.get(item.id);
   const due         = item.due_at ? fmt.dueDate(item.due_at) : null;
   const course      = courseMap.get(item.course_id);
@@ -198,7 +197,7 @@ function CanvasRow({ item, colors, submissionMap, courseMap, onPress }: CanvasRo
 
   return (
     <TouchableOpacity
-      onPress={() => onPress(item)}
+      onPress={() => onNavigate(item.id)}
       activeOpacity={0.75}
       style={[styles.card, { backgroundColor: colors.card, borderColor: isUrgent ? colors.warning + '60' : colors.border }]}
     >
@@ -241,154 +240,6 @@ function CanvasRow({ item, colors, submissionMap, courseMap, onPress }: CanvasRo
   );
 }
 
-/* ── Assignment detail modal ── */
-type AssignmentModalProps = {
-  item:    CanvasAssignment | null;
-  visible: boolean;
-  onClose: () => void;
-  colors:  any;
-  courseMap: Map<number, any>;
-  submissionMap: Map<number, any>;
-};
-function AssignmentModal({ item, visible, onClose, colors, courseMap, submissionMap }: AssignmentModalProps) {
-  const [briefText,    setBriefText]    = useState('');
-  const [briefLoading, setBriefLoading] = useState(false);
-  const briefItemId = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!visible || !item) { setBriefText(''); return; }
-    if (briefItemId.current === item.id) return;
-    briefItemId.current = item.id;
-    setBriefText('');
-    setBriefLoading(true);
-    const desc = item.description ? stripHtml(item.description).slice(0, 400) : '';
-    const due  = item.due_at ? new Date(item.due_at).toLocaleDateString() : 'No due date';
-    let full = '';
-    claude.assignmentBrief(item.name, desc, item.points_possible || 0, due, chunk => {
-      full += chunk;
-      setBriefText(full);
-    }).catch(() => {}).finally(() => setBriefLoading(false));
-  }, [visible, item?.id]);
-
-  if (!item) return null;
-  const course      = courseMap.get(item.course_id);
-  const sub         = submissionMap.get(item.id);
-  const due         = item.due_at ? fmt.dueDate(item.due_at) : null;
-  const isSubmitted = sub && (sub.workflow_state === 'submitted' || sub.workflow_state === 'graded');
-  const isGraded    = sub?.workflow_state === 'graded';
-  const isMissing   = sub?.missing;
-  const desc        = item.description ? stripHtml(item.description).slice(0, 600) : '';
-
-  return (
-    <Modal visible={visible} transparent animationType="slide">
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
-      <View style={[styles.detailSheet, { backgroundColor: colors.card }]}>
-        <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-        <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.bg, position: 'absolute', top: 20, right: 20 }]}>
-          <X size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-
-        {/* Status icon */}
-        <View style={{ alignItems: 'center', marginBottom: 14 }}>
-          <View style={[styles.detailIcon, { backgroundColor: isSubmitted ? colors.success + '20' : colors.primaryLight }]}>
-            {isSubmitted
-              ? <CheckCircle size={28} color={colors.success} />
-              : <BookOpen    size={28} color={colors.primary} />}
-          </View>
-        </View>
-
-        {/* Title */}
-        <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, textAlign: 'center', letterSpacing: -0.3, marginBottom: 4, paddingHorizontal: 40 }}>
-          {item.name}
-        </Text>
-
-        {/* Course pill */}
-        {course && (
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <View style={[styles.coursePill, { backgroundColor: colors.primaryLight, paddingHorizontal: 14, paddingVertical: 5 }]}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>{course.name}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Meta row */}
-        <View style={[styles.metaRow, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-          <View style={styles.metaItem}>
-            <Calendar size={14} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '500' }}>
-              {due ? due.label : 'No due date'}
-            </Text>
-          </View>
-          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.metaItem}>
-            <Flag size={14} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '500' }}>
-              {item.points_possible} pts
-            </Text>
-          </View>
-          <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.metaItem}>
-            <Clock size={14} color={colors.textTertiary} />
-            <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '500' }}>
-              {isGraded ? `Graded: ${sub?.grade}` : isSubmitted ? 'Submitted' : isMissing ? 'Missing' : 'Pending'}
-            </Text>
-          </View>
-        </View>
-
-        {/* AI Brief */}
-        {(briefLoading || briefText.length > 0) && (
-          <View style={[styles.briefBox, { backgroundColor: colors.primaryLight, borderColor: colors.primary + '30' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                AI Summary
-              </Text>
-              {briefLoading && <ActivityIndicator size="small" color={colors.primary} />}
-            </View>
-            <Text style={{ fontSize: 13, color: colors.text, lineHeight: 20 }}>
-              {briefText || ' '}
-            </Text>
-          </View>
-        )}
-
-        {/* Description */}
-        {desc ? (
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-              Description
-            </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 21 }}>
-              {desc}{item.description && item.description.length > 600 ? '…' : ''}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Grade info */}
-        {isGraded && sub?.score != null && (
-          <View style={[styles.gradeBox, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.success }}>
-              Score: {sub.score} / {item.points_possible} · {sub.grade}
-            </Text>
-          </View>
-        )}
-
-        {/* Open in Canvas */}
-        {item.html_url && Platform.OS === 'web' && (
-          <TouchableOpacity
-            onPress={() => (window as any).open(item.html_url, '_blank')}
-            style={[styles.canvasBtn, { backgroundColor: colors.primary }]}
-            activeOpacity={0.85}
-          >
-            <ExternalLink size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Open in Canvas</Text>
-          </TouchableOpacity>
-        )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
 /* ── Main screen ── */
 export default function TasksScreen() {
   const router = useRouter();
@@ -404,7 +255,6 @@ export default function TasksScreen() {
   const [newPriority, setNewPriority] = useState<Priority>('medium');
   const [newDue,      setNewDue]      = useState('');
   const [saving,      setSaving]      = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<CanvasAssignment | null>(null);
 
   const submissionMap = useMemo(() => {
     const map = new Map<number, typeof submissions[0]>();
@@ -541,7 +391,8 @@ export default function TasksScreen() {
             colors={colors}
             submissionMap={submissionMap}
             courseMap={courseMap}
-            onPress={setSelectedAssignment}
+            onPress={() => {}}
+            onNavigate={(id) => router.push(`/canvas/assignment/${id}` as any)}
           />
         ))}
 
@@ -586,16 +437,6 @@ export default function TasksScreen() {
       >
         <Plus size={24} color="#fff" strokeWidth={2.5} />
       </TouchableOpacity>
-
-      {/* ── Assignment detail modal ── */}
-      <AssignmentModal
-        item={selectedAssignment}
-        visible={!!selectedAssignment}
-        onClose={() => setSelectedAssignment(null)}
-        colors={colors}
-        courseMap={courseMap}
-        submissionMap={submissionMap}
-      />
 
       {/* ── Add Task Modal ── */}
       <Modal visible={showAdd} transparent animationType="slide">

@@ -374,8 +374,14 @@ export default function AssignmentDetailSheet({ item, onClose, onCompleteTask }:
           Platform.OS === 'web' ? ({ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000 } as any) : {},
         ]}
       >
-        {/* Handle */}
-        <View style={[styles.handle, { backgroundColor: colors.border }]} />
+        {/* Handle — tapping it opens the full page for canvas items */}
+        <TouchableOpacity
+          onPress={item.kind === 'canvas' ? () => { onClose(); router.push(`/canvas/assignment/${item.data.id}`); } : undefined}
+          activeOpacity={item.kind === 'canvas' ? 0.5 : 1}
+          style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 10, marginHorizontal: -20 }}
+        >
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+        </TouchableOpacity>
 
         {/* Header */}
         <View style={styles.header}>
@@ -389,10 +395,15 @@ export default function AssignmentDetailSheet({ item, onClose, onCompleteTask }:
           </TouchableOpacity>
         </View>
 
-        {/* Title */}
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={3}>
-          {title}
-        </Text>
+        {/* Title — tapping it also opens full page for canvas */}
+        <TouchableOpacity
+          onPress={item.kind === 'canvas' ? () => { onClose(); router.push(`/canvas/assignment/${item.data.id}`); } : undefined}
+          activeOpacity={item.kind === 'canvas' ? 0.7 : 1}
+        >
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={3}>
+            {title}
+          </Text>
+        </TouchableOpacity>
 
         {/* Color divider */}
         <View style={[styles.divider, { backgroundColor: accent }]} />

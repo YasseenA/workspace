@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Platform, Linking, TextInput, ActivityIndicator,
@@ -7,13 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ArrowLeft, ExternalLink, Calendar, Award, Clock,
-  Send, Paperclip, CheckCircle2, AlertCircle, Sparkles,
+  Send, CheckCircle2, AlertCircle, Sparkles,
   BookOpen, Upload,
 } from 'lucide-react-native';
 import { useCanvasStore } from '../../../store/canvas';
 import { useColors } from '../../../lib/theme';
 import { showAlert } from '../../../utils/helpers';
-import { getKey } from '../../../lib/keystore';
+import { claude } from '../../../lib/claude';
 
 function stripHtml(html: string | null | undefined): string {
   if (!html) return '';
@@ -37,13 +37,6 @@ function daysLeft(iso: string | null | undefined) {
   return { label: `${days} days left`,             color: '#10b981' };
 }
 
-function aiSummarize(text: string): string {
-  if (!text) return '';
-  // Simple extractive summary — first 2 sentences
-  const sentences = text.replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]+/g) || [];
-  return sentences.slice(0, 2).join(' ').trim() || text.slice(0, 220) + (text.length > 220 ? '…' : '');
-}
-
 export default function AssignmentPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router  = useRouter();
@@ -54,20 +47,22 @@ export default function AssignmentPage() {
   const course     = useMemo(() => courses.find(c => c.id === assignment?.course_id), [courses, assignment]);
   const submission = useMemo(() => submissions.find(s => s.assignment_id === Number(id)), [submissions, id]);
 
-  const [textInput,   setTextInput]   = useState('');
-  const [urlInput,    setUrlInput]    = useState('');
-  const [fileName,    setFileName]    = useState<string | null>(null);
-  const [fileObj,     setFileObj]     = useState<File | null>(null);
-  const [submitting,  setSubmitting]  = useState(false);
-  const [submitted,   setSubmitted]   = useState(false);
-  const [activeTab,   setActiveTab]   = useState<'text' | 'url' | 'file'>('text');
+  const [textInput,    setTextInput]    = useState('');
+  const [urlInput,     setUrlInput]     = useState('');
+  const [fileName,     setFileName]     = useState<string | null>(null);
+  const [fileObj,      setFileObj]      = useState<File | null>(null);
+  const [submitting,   setSubmitting]   = useState(false);
+  const [submitted,    setSubmitted]    = useState(false);
+  const [activeTab,    setActiveTab]    = useState<'text' | 'url' | 'file'>('text');
+  const [aiSummary,    setAiSummary]    = useState('');
+  const [aiLoading,    setAiLoading]    = useState(false);
+  const aiLoadedRef = useRef<number | null>(null);
 
   const desc   = stripHtml(assignment?.description);
   const types  = assignment?.submission_types?.filter(t => t !== 'none') ?? [];
   const hasText = types.includes('online_text_entry');
   const hasUrl  = types.includes('online_url');
   const hasFile = types.includes('online_upload');
-  const summary = aiSummarize(desc);
 
   const subState  = submission?.workflow_state;
   const alreadyIn = subState === 'submitted' || subState === 'graded' || submitted;
@@ -81,6 +76,21 @@ export default function AssignmentPage() {
     else if (hasUrl) setActiveTab('url');
     else if (hasFile) setActiveTab('file');
   }, [hasText, hasUrl, hasFile]);
+
+  // Stream AI summary when assignment loads
+  useEffect(() => {
+    if (!assignment || aiLoadedRef.current === assignment.id) return;
+    aiLoadedRef.current = assignment.id;
+    setAiSummary('');
+    setAiLoading(true);
+    const descSnippet = desc.slice(0, 400);
+    const dueStr = assignment.due_at ? new Date(assignment.due_at).toLocaleDateString() : 'No due date';
+    let full = '';
+    claude.assignmentBrief(assignment.name, descSnippet, assignment.points_possible || 0, dueStr, chunk => {
+      full += chunk;
+      setAiSummary(full);
+    }).catch(() => {}).finally(() => setAiLoading(false));
+  }, [assignment?.id]);
 
   const handleFilePick = () => {
     if (Platform.OS !== 'web') return;
@@ -211,13 +221,14 @@ export default function AssignmentPage() {
         <View style={{ padding: 16, gap: 16 }}>
 
           {/* ── AI Summary ── */}
-          {summary.length > 0 && (
+          {(aiLoading || aiSummary.length > 0) && (
             <View style={[styles.card, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <Sparkles size={13} color={colors.primary} />
                 <Text style={{ fontSize: 11, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 }}>AI SUMMARY</Text>
+                {aiLoading && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 4 }} />}
               </View>
-              <Text style={{ fontSize: 14, color: colors.text, lineHeight: 21 }}>{summary}</Text>
+              <Text style={{ fontSize: 14, color: colors.text, lineHeight: 21 }}>{aiSummary || ' '}</Text>
             </View>
           )}
 
