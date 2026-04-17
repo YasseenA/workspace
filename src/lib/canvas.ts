@@ -73,6 +73,71 @@ export const canvas = {
     const results = await Promise.all(courseIds.map(id => canvas.getSubmissions(token, id).catch(() => [])));
     return results.flat();
   },
+
+  submitTextEntry: async (token: string, courseId: number, assignmentId: number, text: string) => {
+    const res = await fetch(
+      `${getBase()}/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...schoolHeaders() },
+        body: JSON.stringify({ submission: { submission_type: 'online_text_entry', body: text } }),
+      }
+    );
+    if (!res.ok) throw new Error(`Submission failed (${res.status})`);
+    return res.json();
+  },
+
+  submitUrl: async (token: string, courseId: number, assignmentId: number, url: string) => {
+    const res = await fetch(
+      `${getBase()}/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...schoolHeaders() },
+        body: JSON.stringify({ submission: { submission_type: 'online_url', url } }),
+      }
+    );
+    if (!res.ok) throw new Error(`Submission failed (${res.status})`);
+    return res.json();
+  },
+
+  // Step 1: request upload slot
+  requestFileUpload: async (token: string, courseId: number, assignmentId: number, name: string, size: number, contentType: string) => {
+    const res = await fetch(
+      `${getBase()}/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions/self/files`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...schoolHeaders() },
+        body: JSON.stringify({ name, size, content_type: contentType }),
+      }
+    );
+    if (!res.ok) throw new Error(`Upload request failed (${res.status})`);
+    return res.json(); // { upload_url, upload_params, file_param }
+  },
+
+  // Step 2: upload file to returned URL (no auth header — Canvas handles it)
+  uploadFile: async (uploadUrl: string, uploadParams: Record<string, string>, fileParam: string, file: File): Promise<number> => {
+    const form = new FormData();
+    Object.entries(uploadParams).forEach(([k, v]) => form.append(k, v));
+    form.append(fileParam, file);
+    const res = await fetch(uploadUrl, { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`File upload failed (${res.status})`);
+    const data = await res.json();
+    return data.id as number;
+  },
+
+  // Step 3: submit with file id
+  submitFile: async (token: string, courseId: number, assignmentId: number, fileId: number) => {
+    const res = await fetch(
+      `${getBase()}/api/v1/courses/${courseId}/assignments/${assignmentId}/submissions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...schoolHeaders() },
+        body: JSON.stringify({ submission: { submission_type: 'online_upload', file_ids: [fileId] } }),
+      }
+    );
+    if (!res.ok) throw new Error(`Submission failed (${res.status})`);
+    return res.json();
+  },
 };
 
 export interface CanvasCourseEnrollment {

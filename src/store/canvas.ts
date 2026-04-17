@@ -14,6 +14,7 @@ interface CanvasState {
   connectICal: (feedUrl: string) => Promise<void>;
   disconnect: () => void;
   sync: () => Promise<void>;
+  submitAssignment: (courseId: number, assignmentId: number, subType: 'text' | 'url' | 'file', payload: string | File) => Promise<void>;
   clear: () => void;
 }
 
@@ -120,6 +121,33 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
         canvas_assignments: assignments, canvas_submissions: submissions, canvas_last_sync: now,
       }).eq('user_id', userId).then();
     } catch (e: any) { set({ isSyncing: false, error: e.message }); throw e; }
+  },
+
+  submitAssignment: async (courseId, assignmentId, subType, payload) => {
+    const { token, submissions, userId } = get();
+    if (!token) throw new Error('No API token — connect via Canvas token to submit.');
+
+    if (subType === 'text') {
+      await canvas.submitTextEntry(token, courseId, assignmentId, payload as string);
+    } else if (subType === 'url') {
+      await canvas.submitUrl(token, courseId, assignmentId, payload as string);
+    } else {
+      const file = payload as File;
+      const slot = await canvas.requestFileUpload(token, courseId, assignmentId, file.name, file.size, file.type);
+      const fileId = await canvas.uploadFile(slot.upload_url, slot.upload_params, slot.file_param, file);
+      await canvas.submitFile(token, courseId, assignmentId, fileId);
+    }
+
+    // Optimistically update local submission state
+    const now = new Date().toISOString();
+    const exists = submissions.some(s => s.assignment_id === assignmentId && s.course_id === courseId);
+    const newSubs: CanvasSubmission[] = exists
+      ? submissions.map(s => s.assignment_id === assignmentId && s.course_id === courseId
+          ? { ...s, workflow_state: 'submitted', submitted_at: now, missing: false }
+          : s)
+      : [...submissions, { assignment_id: assignmentId, course_id: courseId, workflow_state: 'submitted', submitted_at: now, score: null, grade: null, late: false, missing: false }];
+    set({ submissions: newSubs });
+    if (userId) supabase.from('profiles').update({ canvas_submissions: newSubs }).eq('user_id', userId).then();
   },
 
   clear: () => set({ connected: false, token: null, icalUrl: null, courses: [], assignments: [], submissions: [], lastSync: null, isSyncing: false, error: null, userId: null }),

@@ -1,18 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, StyleSheet,
-  ScrollView, Platform, Linking,
+  ScrollView, Platform, Linking, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   X, ExternalLink, Clock, BookOpen, CheckSquare,
   Award, AlertCircle, CheckCircle2, Circle, Timer,
+  Send, Paperclip,
 } from 'lucide-react-native';
 import { useColors } from '../lib/theme';
 import { useFocusStore } from '../store/focus';
+import { useCanvasStore } from '../store/canvas';
 import { CanvasAssignment, CanvasCourse, CanvasSubmission } from '../lib/canvas';
 import { TeamsAssignment } from '../lib/teams';
 import { Task } from '../store/tasks';
+import { showAlert } from '../utils/helpers';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +60,7 @@ function CanvasDetail({ data, course, submission, colors }: {
   data: CanvasAssignment; course?: CanvasCourse;
   submission?: CanvasSubmission; colors: any;
 }) {
+  const { token, submitAssignment } = useCanvasStore();
   const due     = daysUntil(data.due_at);
   const desc    = stripHtml(data.description);
   const types   = data.submission_types?.filter(t => t !== 'none') ?? [];
@@ -72,6 +76,53 @@ function CanvasDetail({ data, course, submission, colors }: {
     subState === 'graded'    ? `Graded · ${submission?.grade ?? '—'}` :
     subState === 'submitted' ? 'Submitted' :
     isMissing                ? 'Missing' : 'Not submitted';
+
+  // Submission form state
+  const [textInput, setTextInput]   = useState('');
+  const [urlInput, setUrlInput]     = useState('');
+  const [fileName, setFileName]     = useState<string | null>(null);
+  const [fileObj, setFileObj]       = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted]   = useState(false);
+
+  const canSubmit = token && subState !== 'submitted' && subState !== 'graded' && !submitted;
+  const hasText   = types.includes('online_text_entry');
+  const hasUrl    = types.includes('online_url');
+  const hasFile   = types.includes('online_upload');
+
+  const handleFilePick = () => {
+    if (Platform.OS !== 'web') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,image/*,.doc,.docx,.txt,.zip';
+    input.onchange = () => {
+      const f = input.files?.[0];
+      if (f) { setFileObj(f); setFileName(f.name); }
+    };
+    input.click();
+  };
+
+  const handleSubmit = async (type: 'text' | 'url' | 'file') => {
+    if (!token) return;
+    const payload =
+      type === 'text' ? textInput.trim() :
+      type === 'url'  ? urlInput.trim() :
+      fileObj!;
+    if (!payload || (typeof payload === 'string' && !payload)) {
+      showAlert('Empty submission', 'Please enter something before submitting.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await submitAssignment(data.course_id, data.id, type, payload);
+      setSubmitted(true);
+      showAlert('Submitted!', 'Your assignment has been submitted successfully.');
+    } catch (e: any) {
+      showAlert('Submission failed', e.message || 'Something went wrong.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <>
@@ -117,13 +168,15 @@ function CanvasDetail({ data, course, submission, colors }: {
             </Text>
           </View>
         )}
-        {submission && (
+        {(submission || submitted) && (
           <View style={[styles.chip, { backgroundColor: subColor + '18', borderColor: subColor + '40' }]}>
-            {(subState === 'submitted' || subState === 'graded')
-              ? <CheckCircle2 size={12} color={subColor} />
+            {(subState === 'submitted' || subState === 'graded' || submitted)
+              ? <CheckCircle2 size={12} color={submitted ? '#3b82f6' : subColor} />
               : <AlertCircle size={12} color={subColor} />
             }
-            <Text style={{ fontSize: 12, fontWeight: '600', color: subColor }}>{subLabel}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: submitted ? '#3b82f6' : subColor }}>
+              {submitted ? 'Submitted' : subLabel}
+            </Text>
           </View>
         )}
       </View>
@@ -148,6 +201,92 @@ function CanvasDetail({ data, course, submission, colors }: {
           <Text style={styles.openBtnText}>Open in Canvas</Text>
         </TouchableOpacity>
       ) : null}
+
+      {/* ── Submission form (only for API token users on unsubmitted assignments) ── */}
+      {canSubmit && (hasText || hasUrl || hasFile) && (
+        <View style={[styles.submitSection, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+          <Text style={[styles.submitHeading, { color: colors.text }]}>Submit Assignment</Text>
+
+          {hasText && (
+            <>
+              <TextInput
+                style={[styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
+                placeholder="Type your submission here…"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                numberOfLines={5}
+                value={textInput}
+                onChangeText={setTextInput}
+                textAlignVertical="top"
+              />
+              <TouchableOpacity
+                style={[styles.submitBtn, { opacity: submitting ? 0.6 : 1 }]}
+                onPress={() => handleSubmit('text')}
+                disabled={submitting}
+                activeOpacity={0.85}
+              >
+                {submitting
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <><Send size={14} color="#fff" /><Text style={styles.openBtnText}>Submit Text</Text></>
+                }
+              </TouchableOpacity>
+            </>
+          )}
+
+          {hasUrl && !hasText && (
+            <>
+              <TextInput
+                style={[styles.urlInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
+                placeholder="https://..."
+                placeholderTextColor={colors.textTertiary}
+                value={urlInput}
+                onChangeText={setUrlInput}
+                keyboardType="url"
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={[styles.submitBtn, { opacity: submitting ? 0.6 : 1 }]}
+                onPress={() => handleSubmit('url')}
+                disabled={submitting}
+                activeOpacity={0.85}
+              >
+                {submitting
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <><Send size={14} color="#fff" /><Text style={styles.openBtnText}>Submit URL</Text></>
+                }
+              </TouchableOpacity>
+            </>
+          )}
+
+          {hasFile && !hasText && !hasUrl && Platform.OS === 'web' && (
+            <>
+              <TouchableOpacity
+                style={[styles.filePickerBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+                onPress={handleFilePick}
+                activeOpacity={0.8}
+              >
+                <Paperclip size={15} color={colors.primary} />
+                <Text style={{ fontSize: 14, color: fileName ? colors.text : colors.textTertiary, flex: 1 }} numberOfLines={1}>
+                  {fileName || 'Choose a file…'}
+                </Text>
+              </TouchableOpacity>
+              {fileObj && (
+                <TouchableOpacity
+                  style={[styles.submitBtn, { opacity: submitting ? 0.6 : 1 }]}
+                  onPress={() => handleSubmit('file')}
+                  disabled={submitting}
+                  activeOpacity={0.85}
+                >
+                  {submitting
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <><Send size={14} color="#fff" /><Text style={styles.openBtnText}>Upload & Submit</Text></>
+                  }
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+      )}
     </>
   );
 }
@@ -430,4 +569,11 @@ const styles = StyleSheet.create({
   descBox: { borderRadius: 12, borderWidth: 0.5, padding: 12, marginBottom: 14 },
   openBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 4 },
   openBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  submitSection: { marginTop: 14, borderRadius: 16, borderWidth: 0.5, padding: 14, gap: 10 },
+  submitHeading: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  textArea: { borderRadius: 12, borderWidth: 0.5, padding: 12, fontSize: 14, minHeight: 110 },
+  urlInput: { borderRadius: 12, borderWidth: 0.5, padding: 12, fontSize: 14 },
+  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 12, backgroundColor: '#10b981' },
+  filePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 0.5, padding: 12, borderStyle: 'dashed' },
 });
