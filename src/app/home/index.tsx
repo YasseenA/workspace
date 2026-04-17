@@ -577,7 +577,7 @@ export default function HomeScreen() {
                 <ChevronRight size={14} color={colors.primary} />
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 }}>
+            <View style={{ gap: 8, paddingHorizontal: 16 }}>
               {courses
                 .filter(c => c.enrollments?.[0]?.computed_current_score != null)
                 .slice(0, 6)
@@ -589,10 +589,18 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       key={c.id}
                       onPress={() => router.push('/canvas')}
-                      style={[styles.gradeCard, { backgroundColor: gc + '12', borderColor: gc + '40' }]}
+                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                     >
-                      <Text style={{ fontSize: 22, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
-                      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 3 }} numberOfLines={1}>{c.course_code}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
+                        <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
+                        <Text style={{ fontSize: 10, color: gc, fontWeight: '600', marginTop: 1 }}>
+                          {score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D'}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -740,10 +748,8 @@ const styles = StyleSheet.create({
   noteDate:  { fontSize: 11 },
 
   /* Grade card */
-  gradeCard: {
-    width: 120, alignItems: 'center', paddingVertical: 16, paddingHorizontal: 12,
-    borderRadius: 16, borderWidth: 1.5,
-  },
+  gradeCard: { width: 120, alignItems: 'center', paddingVertical: 16, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1.5 },
+  gradeRow:  { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 0.5, paddingHorizontal: 14, paddingVertical: 12 },
 
   /* Empty card */
   emptyCard: {
