@@ -574,7 +574,6 @@ export default function HomeScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Grades</Text>
               <TouchableOpacity onPress={() => router.push('/canvas')} style={styles.seeAll}>
                 <Text style={[styles.seeAllText, { color: colors.primary }]}>Canvas</Text>
-                <ChevronRight size={14} color={colors.primary} />
               </TouchableOpacity>
             </View>
             <View style={{ gap: 8, paddingHorizontal: 16 }}>
@@ -595,7 +594,7 @@ export default function HomeScreen() {
                         <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
                         <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
+                      <View style={{ alignItems: 'center', minWidth: 60 }}>
                         <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
                         <Text style={{ fontSize: 10, color: gc, fontWeight: '600', marginTop: 1 }}>
                           {score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D'}
