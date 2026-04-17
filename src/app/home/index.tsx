@@ -588,14 +588,15 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       key={c.id}
                       onPress={() => router.push('/settings/grades')}
-                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border, position: 'relative' }]}
                     >
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
                         <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
                       </View>
-                      <View style={{ alignItems: 'center', justifyContent: 'center', minWidth: 70 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                      {/* Grade absolutely centered in the row */}
+                      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' } as any}>
+                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
                           <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
                           <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>
                             {score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D'}
