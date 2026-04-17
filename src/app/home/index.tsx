@@ -572,8 +572,8 @@ export default function HomeScreen() {
           <>
             <View style={[styles.sectionHeader, { marginTop: 12 }]}>
               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Grades</Text>
-              <TouchableOpacity onPress={() => router.push('/canvas')} style={styles.seeAll}>
-                <Text style={[styles.seeAllText, { color: colors.primary }]}>Canvas</Text>
+              <TouchableOpacity onPress={() => router.push('/settings/grades')} style={styles.seeAll}>
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>Calculator</Text>
               </TouchableOpacity>
             </View>
             <View style={{ gap: 8, paddingHorizontal: 16 }}>
@@ -587,7 +587,7 @@ export default function HomeScreen() {
                   return (
                     <TouchableOpacity
                       key={c.id}
-                      onPress={() => router.push('/canvas')}
+                      onPress={() => router.push('/settings/grades')}
                       style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                     >
                       <View style={{ flex: 1 }}>
