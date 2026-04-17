@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, Modal, TouchableOpacity, StyleSheet,
-  ScrollView, Platform, Linking, TextInput, ActivityIndicator,
+  ScrollView, Platform, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   X, ExternalLink, Clock, BookOpen, CheckSquare,
-  Award, AlertCircle, CheckCircle2, Circle, Timer,
-  Send, Paperclip,
+  Award, AlertCircle, CheckCircle2, Circle, Timer, FileText,
 } from 'lucide-react-native';
 import { useColors } from '../lib/theme';
 import { useFocusStore } from '../store/focus';
@@ -15,7 +14,6 @@ import { useCanvasStore } from '../store/canvas';
 import { CanvasAssignment, CanvasCourse, CanvasSubmission } from '../lib/canvas';
 import { TeamsAssignment } from '../lib/teams';
 import { Task } from '../store/tasks';
-import { showAlert } from '../utils/helpers';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,14 +54,15 @@ function stripHtml(html: string | null | undefined): string {
 
 // ── Sub-renderers ─────────────────────────────────────────────────────────────
 
-function CanvasDetail({ data, course, submission, colors }: {
+function CanvasDetail({ data, course, submission, colors, onClose }: {
   data: CanvasAssignment; course?: CanvasCourse;
-  submission?: CanvasSubmission; colors: any;
+  submission?: CanvasSubmission; colors: any; onClose: () => void;
 }) {
-  const { token, submitAssignment } = useCanvasStore();
-  const due     = daysUntil(data.due_at);
-  const desc    = stripHtml(data.description);
-  const types   = data.submission_types?.filter(t => t !== 'none') ?? [];
+  const router    = useRouter();
+  const { token } = useCanvasStore();
+  const due       = daysUntil(data.due_at);
+  const desc      = stripHtml(data.description);
+  const types     = data.submission_types?.filter(t => t !== 'none') ?? [];
 
   const subState  = submission?.workflow_state;
   const isMissing = submission?.missing;
@@ -77,51 +76,12 @@ function CanvasDetail({ data, course, submission, colors }: {
     subState === 'submitted' ? 'Submitted' :
     isMissing                ? 'Missing' : 'Not submitted';
 
-  // Submission form state
-  const [textInput, setTextInput]   = useState('');
-  const [urlInput, setUrlInput]     = useState('');
-  const [fileName, setFileName]     = useState<string | null>(null);
-  const [fileObj, setFileObj]       = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted]   = useState(false);
+  const canSubmit = !!token && subState !== 'submitted' && subState !== 'graded';
+  const hasSubmitTypes = types.some(t => ['online_text_entry', 'online_url', 'online_upload'].includes(t));
 
-  const canSubmit = token && subState !== 'submitted' && subState !== 'graded' && !submitted;
-  const hasText   = types.includes('online_text_entry');
-  const hasUrl    = types.includes('online_url');
-  const hasFile   = types.includes('online_upload');
-
-  const handleFilePick = () => {
-    if (Platform.OS !== 'web') return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/pdf,image/*,.doc,.docx,.txt,.zip';
-    input.onchange = () => {
-      const f = input.files?.[0];
-      if (f) { setFileObj(f); setFileName(f.name); }
-    };
-    input.click();
-  };
-
-  const handleSubmit = async (type: 'text' | 'url' | 'file') => {
-    if (!token) return;
-    const payload =
-      type === 'text' ? textInput.trim() :
-      type === 'url'  ? urlInput.trim() :
-      fileObj!;
-    if (!payload || (typeof payload === 'string' && !payload)) {
-      showAlert('Empty submission', 'Please enter something before submitting.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await submitAssignment(data.course_id, data.id, type, payload);
-      setSubmitted(true);
-      showAlert('Submitted!', 'Your assignment has been submitted successfully.');
-    } catch (e: any) {
-      showAlert('Submission failed', e.message || 'Something went wrong.');
-    } finally {
-      setSubmitting(false);
-    }
+  const goToFullPage = () => {
+    onClose();
+    router.push(`/canvas/assignment/${data.id}`);
   };
 
   return (
@@ -151,14 +111,12 @@ function CanvasDetail({ data, course, submission, colors }: {
         )}
       </View>
 
-      {/* Points + submission row */}
+      {/* Points + submission status */}
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {data.points_possible > 0 && (
           <View style={[styles.chip, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Award size={12} color={colors.primary} />
-            <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-              {data.points_possible} pts
-            </Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>{data.points_possible} pts</Text>
           </View>
         )}
         {types.length > 0 && (
@@ -168,125 +126,51 @@ function CanvasDetail({ data, course, submission, colors }: {
             </Text>
           </View>
         )}
-        {(submission || submitted) && (
+        {submission && (
           <View style={[styles.chip, { backgroundColor: subColor + '18', borderColor: subColor + '40' }]}>
-            {(subState === 'submitted' || subState === 'graded' || submitted)
-              ? <CheckCircle2 size={12} color={submitted ? '#3b82f6' : subColor} />
+            {(subState === 'submitted' || subState === 'graded')
+              ? <CheckCircle2 size={12} color={subColor} />
               : <AlertCircle size={12} color={subColor} />
             }
-            <Text style={{ fontSize: 12, fontWeight: '600', color: submitted ? '#3b82f6' : subColor }}>
-              {submitted ? 'Submitted' : subLabel}
-            </Text>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: subColor }}>{subLabel}</Text>
           </View>
         )}
       </View>
 
-      {/* Description */}
+      {/* Description preview */}
       {desc.length > 0 && (
         <View style={[styles.descBox, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-          <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }} numberOfLines={6}>
+          <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }} numberOfLines={4}>
             {desc}
           </Text>
         </View>
       )}
 
+      {/* Submit Assignment — full page */}
+      {hasSubmitTypes && (
+        <TouchableOpacity
+          style={[styles.openBtn, { backgroundColor: canSubmit ? colors.primary : colors.card, borderWidth: canSubmit ? 0 : 0.5, borderColor: colors.border }]}
+          onPress={goToFullPage}
+          activeOpacity={0.85}
+        >
+          <FileText size={15} color={canSubmit ? '#fff' : colors.textSecondary} />
+          <Text style={[styles.openBtnText, { color: canSubmit ? '#fff' : colors.textSecondary }]}>
+            {canSubmit ? 'Submit Assignment' : 'View Submission'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Open in Canvas */}
       {data.html_url ? (
         <TouchableOpacity
-          style={[styles.openBtn, { backgroundColor: '#10b981' }]}
+          style={[styles.openBtn, { backgroundColor: hasSubmitTypes ? colors.card : '#10b981', borderWidth: hasSubmitTypes ? 0.5 : 0, borderColor: colors.border, marginTop: hasSubmitTypes ? 8 : 4 }]}
           onPress={() => Linking.openURL(data.html_url)}
           activeOpacity={0.85}
         >
-          <ExternalLink size={15} color="#fff" />
-          <Text style={styles.openBtnText}>Open in Canvas</Text>
+          <ExternalLink size={15} color={hasSubmitTypes ? colors.textSecondary : '#fff'} />
+          <Text style={[styles.openBtnText, { color: hasSubmitTypes ? colors.textSecondary : '#fff' }]}>Open in Canvas</Text>
         </TouchableOpacity>
       ) : null}
-
-      {/* ── Submission form (only for API token users on unsubmitted assignments) ── */}
-      {canSubmit && (hasText || hasUrl || hasFile) && (
-        <View style={[styles.submitSection, { borderColor: colors.border, backgroundColor: colors.bg }]}>
-          <Text style={[styles.submitHeading, { color: colors.text }]}>Submit Assignment</Text>
-
-          {hasText && (
-            <>
-              <TextInput
-                style={[styles.textArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                placeholder="Type your submission here…"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                numberOfLines={5}
-                value={textInput}
-                onChangeText={setTextInput}
-                textAlignVertical="top"
-              />
-              <TouchableOpacity
-                style={[styles.submitBtn, { opacity: submitting ? 0.6 : 1 }]}
-                onPress={() => handleSubmit('text')}
-                disabled={submitting}
-                activeOpacity={0.85}
-              >
-                {submitting
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <><Send size={14} color="#fff" /><Text style={styles.openBtnText}>Submit Text</Text></>
-                }
-              </TouchableOpacity>
-            </>
-          )}
-
-          {hasUrl && !hasText && (
-            <>
-              <TextInput
-                style={[styles.urlInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.card }]}
-                placeholder="https://..."
-                placeholderTextColor={colors.textTertiary}
-                value={urlInput}
-                onChangeText={setUrlInput}
-                keyboardType="url"
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                style={[styles.submitBtn, { opacity: submitting ? 0.6 : 1 }]}
-                onPress={() => handleSubmit('url')}
-                disabled={submitting}
-                activeOpacity={0.85}
-              >
-                {submitting
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <><Send size={14} color="#fff" /><Text style={styles.openBtnText}>Submit URL</Text></>
-                }
-              </TouchableOpacity>
-            </>
-          )}
-
-          {hasFile && !hasText && !hasUrl && Platform.OS === 'web' && (
-            <>
-              <TouchableOpacity
-                style={[styles.filePickerBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-                onPress={handleFilePick}
-                activeOpacity={0.8}
-              >
-                <Paperclip size={15} color={colors.primary} />
-                <Text style={{ fontSize: 14, color: fileName ? colors.text : colors.textTertiary, flex: 1 }} numberOfLines={1}>
-                  {fileName || 'Choose a file…'}
-                </Text>
-              </TouchableOpacity>
-              {fileObj && (
-                <TouchableOpacity
-                  style={[styles.submitBtn, { opacity: submitting ? 0.6 : 1 }]}
-                  onPress={() => handleSubmit('file')}
-                  disabled={submitting}
-                  activeOpacity={0.85}
-                >
-                  {submitting
-                    ? <ActivityIndicator color="#fff" size="small" />
-                    : <><Send size={14} color="#fff" /><Text style={styles.openBtnText}>Upload & Submit</Text></>
-                  }
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
-      )}
     </>
   );
 }
@@ -523,6 +407,7 @@ export default function AssignmentDetailSheet({ item, onClose, onCompleteTask }:
               course={item.course}
               submission={item.submission}
               colors={colors}
+              onClose={onClose}
             />
           )}
           {item.kind === 'teams' && (
@@ -568,12 +453,5 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, borderWidth: 0.5 },
   descBox: { borderRadius: 12, borderWidth: 0.5, padding: 12, marginBottom: 14 },
   openBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 4 },
-  openBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-
-  submitSection: { marginTop: 14, borderRadius: 16, borderWidth: 0.5, padding: 14, gap: 10 },
-  submitHeading: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
-  textArea: { borderRadius: 12, borderWidth: 0.5, padding: 12, fontSize: 14, minHeight: 110 },
-  urlInput: { borderRadius: 12, borderWidth: 0.5, padding: 12, fontSize: 14 },
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 12, backgroundColor: '#10b981' },
-  filePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 0.5, padding: 12, borderStyle: 'dashed' },
+  openBtnText: { fontSize: 15, fontWeight: '700' },
 });
