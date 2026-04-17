@@ -589,10 +589,10 @@ export default function HomeScreen() {
                     <TouchableOpacity
                       key={c.id}
                       onPress={() => router.push('/canvas')}
-                      style={[styles.gradeCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      style={[styles.gradeCard, { backgroundColor: gc + '12', borderColor: gc + '40' }]}
                     >
-                      <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
-                      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }} numberOfLines={1}>{c.course_code}</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
+                      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 3 }} numberOfLines={1}>{c.course_code}</Text>
                     </TouchableOpacity>
                   );
                 })}
