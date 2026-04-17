@@ -326,12 +326,7 @@ export default function CanvasScreen() {
                       </View>
                       {currentScore != null ? (
                         <TouchableOpacity onPress={() => router.push('/settings/grades')} activeOpacity={0.7} style={{ alignItems: 'center', justifyContent: 'center', minWidth: 70 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                            <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>{Math.round(currentScore)}%</Text>
-                            <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>
-                              {currentScore >= 90 ? 'A' : currentScore >= 80 ? 'B' : currentScore >= 70 ? 'C' : 'D'}
-                            </Text>
-                          </View>
+                          <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>{Math.round(currentScore)}%</Text>
                         </TouchableOpacity>
                       ) : (
                         <Badge variant="neutral" size="sm">{courseAssignments.length} tasks</Badge>

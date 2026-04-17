@@ -596,12 +596,7 @@ export default function HomeScreen() {
                       </View>
                       {/* Grade absolutely centered in the row */}
                       <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' } as any}>
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-                          <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
-                          <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>
-                            {score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D'}
-                          </Text>
-                        </View>
+                        <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
                       </View>
                     </TouchableOpacity>
                   );
