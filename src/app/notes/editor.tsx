@@ -213,7 +213,6 @@ export default function NoteEditorScreen() {
 
   // ── Auto-save ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!title.trim()) { setSaveStatus('unsaved'); return; }
     setSaveStatus('unsaved');
     clearTimeout(autoSaveRef.current);
     autoSaveRef.current = setTimeout(() => {
@@ -457,13 +456,16 @@ export default function NoteEditorScreen() {
 
   // ── Save on back ───────────────────────────────────────────────────────────
   const handleSave = () => {
-    if (!title.trim()) { showAlert('Title Required', 'Please add a title before leaving.'); return; }
     clearTimeout(autoSaveRef.current);
-    // Capture latest html from contenteditable before leaving
     const latestContent = (IS_WEB && contentRef.current) ? contentRef.current.innerHTML : content;
+    const hasContent = latestContent.trim().replace(/<[^>]*>/g, '').trim().length > 0 || images.length > 0;
+    // Nothing written at all — just leave without saving
+    if (!title.trim() && !hasContent) { router.back(); return; }
+    // Has content but no title — save as draft
+    const finalTitle = title.trim() || `Draft — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
     const target = noteId || existingNote?.id;
-    if (target) updateNote(target, { title, content: latestContent, tags, images, notebookId: notebookId || undefined });
-    else createNote({ title, content: latestContent, tags, images, notebookId: notebookId || undefined });
+    if (target) updateNote(target, { title: finalTitle, content: latestContent, tags, images, notebookId: notebookId || undefined });
+    else createNote({ title: finalTitle, content: latestContent, tags, images, notebookId: notebookId || undefined });
     router.back();
   };
 
