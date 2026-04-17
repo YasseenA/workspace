@@ -577,7 +577,7 @@ export default function HomeScreen() {
                 <ChevronRight size={14} color={colors.primary} />
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 }}>
               {courses
                 .filter(c => c.enrollments?.[0]?.computed_current_score != null)
                 .slice(0, 6)
@@ -741,8 +741,8 @@ const styles = StyleSheet.create({
 
   /* Grade card */
   gradeCard: {
-    width: 100, alignItems: 'center', paddingVertical: 14,
-    borderRadius: 16, borderWidth: 0.5,
+    width: 120, alignItems: 'center', paddingVertical: 16, paddingHorizontal: 12,
+    borderRadius: 16, borderWidth: 1.5,
   },
 
   /* Empty card */
