@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, ActivityIndicator, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { Zap, Copy, Send, RotateCcw, Upload, BookmarkPlus, Layers, X, Check } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Badge } from '../../components/ui';
@@ -88,6 +89,7 @@ export default function AIStudioScreen() {
   const isWeb   = Platform.OS === 'web';
   const { createNote } = useNotesStore();
   const { createDeck } = useFlashcardsStore();
+  const params  = useLocalSearchParams<{ assignmentName?: string; assignmentDesc?: string; assignmentPoints?: string; assignmentDue?: string }>();
 
   const [saveDeckModal, setSaveDeckModal] = useState(false);
   const [deckName, setDeckName]           = useState('');
@@ -131,6 +133,36 @@ export default function AIStudioScreen() {
     setCanvasText(''); setFlashcards([]); setQuiz([]); setAiResult(null); setSyllabusData(null);
     setFlipped(new Set()); setSelAns({}); setShownAns({});
   };
+
+  // ── Auto-load assignment context from URL params ───────────────────────────
+  const autoTriggered = useRef(false);
+  useEffect(() => {
+    if (!params.assignmentName || autoTriggered.current) return;
+    autoTriggered.current = true;
+    const { assignmentName, assignmentDesc, assignmentPoints, assignmentDue } = params;
+    const ctx = [
+      `Assignment: ${assignmentName}`,
+      assignmentDue   ? `Due: ${assignmentDue}` : '',
+      assignmentPoints ? `Points: ${assignmentPoints}` : '',
+      assignmentDesc  ? `\nDescription:\n${assignmentDesc}` : '',
+    ].filter(Boolean).join('\n');
+    setContent(ctx);
+    // Give state time to settle then fire the chat
+    const q = `Help me understand and work through this assignment step by step. What do I need to do, what should I focus on first, and what's the best approach to complete it?`;
+    setTimeout(() => {
+      const withUser: Msg[] = [{ role: 'user', text: q, color: '#7c3aed' }];
+      const placeholder: Msg = { role: 'assistant', text: '' };
+      setMsgs([...withUser, placeholder]);
+      setLoading(true);
+      streamIdx.current = 1;
+      const system = `You are a helpful AI study assistant. The student is working on the following Canvas assignment:\n\n${ctx}\n\nHelp them understand the assignment and plan their approach. Be specific, structured, and actionable.`;
+      let full = '';
+      claude.chat(system, [{ role: 'user', content: q }], chunk => {
+        full += chunk;
+        setMsgs(prev => { const c = [...prev]; c[1] = { ...c[1], text: full }; return c; });
+      }).catch(() => {}).finally(() => setLoading(false));
+    }, 300);
+  }, [params.assignmentName]);
 
   const handleImagePaste = (file: File) => {
     const mime = file.type as string;

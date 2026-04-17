@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ArrowLeft, ExternalLink, Calendar, Award, Clock,
   Send, CheckCircle2, AlertCircle, Sparkles,
-  BookOpen, Upload,
+  BookOpen, Upload, Zap,
 } from 'lucide-react-native';
 import { useCanvasStore } from '../../../store/canvas';
 import { useColors } from '../../../lib/theme';
@@ -384,15 +384,35 @@ export default function AssignmentPage() {
             </View>
           )}
 
+          {/* AI Help button */}
+          <TouchableOpacity
+            style={[styles.aiBtn]}
+            onPress={() => {
+              const p = new URLSearchParams({
+                assignmentName:   assignment.name,
+                assignmentDesc:   desc.slice(0, 600),
+                assignmentPoints: String(assignment.points_possible || ''),
+                assignmentDue:    assignment.due_at
+                  ? new Date(assignment.due_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                  : '',
+              });
+              router.push(`/ai-studio?${p.toString()}` as any);
+            }}
+            activeOpacity={0.85}
+          >
+            <Zap size={16} color="#fff" fill="#fff" />
+            <Text style={styles.submitLabel}>Get AI Help with This Assignment</Text>
+          </TouchableOpacity>
+
           {/* Open in Canvas */}
           {assignment.html_url && (
             <TouchableOpacity
-              style={[styles.openBtn, { backgroundColor: colors.primary }]}
+              style={[styles.openBtn, { backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.border }]}
               onPress={() => Linking.openURL(assignment.html_url)}
               activeOpacity={0.85}
             >
-              <ExternalLink size={16} color="#fff" />
-              <Text style={styles.submitLabel}>Open in Canvas</Text>
+              <ExternalLink size={16} color={colors.textSecondary} />
+              <Text style={[styles.submitLabel, { color: colors.textSecondary }]}>Open in Canvas</Text>
             </TouchableOpacity>
           )}
 
@@ -461,6 +481,12 @@ const styles = StyleSheet.create({
   openBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, borderRadius: 14, paddingVertical: 15,
+  },
+  aiBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, borderRadius: 14, paddingVertical: 15,
+    background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' as any,
+    backgroundColor: '#7c3aed',
   },
   submitLabel: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
