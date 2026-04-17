@@ -594,9 +594,9 @@ export default function HomeScreen() {
                         <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
                         <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
                       </View>
-                      <View style={{ alignItems: 'center', minWidth: 60 }}>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{grade ?? `${Math.round(score)}%`}</Text>
-                        <Text style={{ fontSize: 10, color: gc, fontWeight: '600', marginTop: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 22, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
+                        <Text style={{ fontSize: 28, fontWeight: '900', color: gc, letterSpacing: -1 }}>
                           {score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D'}
                         </Text>
                       </View>
