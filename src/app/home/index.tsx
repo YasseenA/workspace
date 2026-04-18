@@ -26,6 +26,7 @@ import { claude } from '../../lib/claude';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fmt, priorityColor, initials } from '../../utils/helpers';
 import AssignmentDetailSheet, { SheetItem } from '../../components/AssignmentDetailSheet';
+import AppTour, { shouldShowTour } from '../../components/AppTour';
 
 const BRIEF_CACHE_KEY = 'home_daily_brief';
 const BRIEF_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -73,6 +74,13 @@ export default function HomeScreen() {
   const [briefText,    setBriefText]    = useState('');
   const [briefLoading, setBriefLoading] = useState(false);
   const briefStarted = useRef(false);
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    if (hasOnboarded) {
+      shouldShowTour().then(show => { if (show) setShowTour(true); });
+    }
+  }, [hasOnboarded]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -226,6 +234,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      {showTour && <AppTour onComplete={() => setShowTour(false)} />}
       <TopBar />
       <ScrollView
         contentContainerStyle={[styles.scroll, Platform.OS === 'web' && { paddingTop: 50 }]}

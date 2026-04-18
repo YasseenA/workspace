@@ -120,7 +120,15 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       if (userId) supabase.from('profiles').update({
         canvas_assignments: assignments, canvas_submissions: submissions, canvas_last_sync: now,
       }).eq('user_id', userId).then();
-    } catch (e: any) { set({ isSyncing: false, error: e.message }); throw e; }
+    } catch (e: any) {
+      if (e.message === 'TOKEN_EXPIRED') {
+        set({ isSyncing: false, connected: false, token: null, error: 'Your Canvas token has expired. Please reconnect.' });
+        if (userId) supabase.from('profiles').update({ canvas_token: null }).eq('user_id', userId).then();
+      } else {
+        set({ isSyncing: false, error: e.message });
+      }
+      throw e;
+    }
   },
 
   submitAssignment: async (courseId, assignmentId, subType, payload) => {

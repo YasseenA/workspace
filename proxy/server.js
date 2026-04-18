@@ -17,6 +17,18 @@ const DEFAULT_CANVAS_HOST = 'bc.instructure.com';
 const CLAUDE_HOST  = 'api.anthropic.com';
 const OPENAI_HOST  = 'api.openai.com';
 
+const ALLOWED_ORIGINS = new Set([
+  'https://workspace-edu.com',
+  'https://www.workspace-edu.com',
+  'http://localhost:8081',
+  'http://localhost:19006',
+]);
+
+function getCorsOrigin(req) {
+  const origin = req.headers['origin'] || '';
+  return ALLOWED_ORIGINS.has(origin) ? origin : 'https://workspace-edu.com';
+}
+
 // Use Google DNS — avoids EAI_AGAIN on some hosts
 const resolver = new dns.Resolver();
 resolver.setServers(['8.8.8.8', '8.8.4.4']);
@@ -54,7 +66,7 @@ function forwardTo(req, res, targetHost, targetPath) {
     };
 
     const proxy = https.request(options, (proxyRes) => {
-      const out = { ...proxyRes.headers, 'access-control-allow-origin': '*' };
+      const out = { ...proxyRes.headers, 'access-control-allow-origin': getCorsOrigin(req) };
       res.writeHead(proxyRes.statusCode, out);
       proxyRes.pipe(res, { end: true });
     });
@@ -72,10 +84,11 @@ function forwardTo(req, res, targetHost, targetPath) {
 }
 
 const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', getCorsOrigin(req));
   res.setHeader('Access-Control-Allow-Headers',
     'Authorization, Content-Type, Accept, x-api-key, anthropic-version, anthropic-beta, X-Canvas-Base');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
@@ -116,7 +129,7 @@ const server = http.createServer((req, res) => {
           }
           res.writeHead(proxyRes.statusCode, {
             'Content-Type': proxyRes.headers['content-type'] || 'text/calendar',
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': getCorsOrigin(req),
           });
           proxyRes.pipe(res);
         });

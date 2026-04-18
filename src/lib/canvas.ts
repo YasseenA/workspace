@@ -39,6 +39,7 @@ export const canvas = {
       `${getBase()}/api/v1/courses?enrollment_state=active&per_page=50&include[]=total_scores&include[]=current_grading_period_scores`,
       { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } }
     );
+    if (res.status === 401) throw new Error('TOKEN_EXPIRED');
     if (!res.ok) throw new Error('Failed to fetch courses');
     return res.json();
   },

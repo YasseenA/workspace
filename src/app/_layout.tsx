@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettingsStore } from '../store/settings';
 import { useDataSync } from '../hooks/useDataSync';
 import { initKeystore } from '../lib/keystore';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const CLERK_KEY = 'pk_live_Y2xlcmsud29ya3NwYWNlLWVkdS5jb20k';
 
@@ -105,8 +106,10 @@ export default function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
-      <AuthGate />
-    </ClerkProvider>
+    <ErrorBoundary>
+      <ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
+        <AuthGate />
+      </ClerkProvider>
+    </ErrorBoundary>
   );
 }

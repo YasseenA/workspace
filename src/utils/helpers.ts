@@ -130,9 +130,9 @@ export const fmt = {
   dueDate: (d: string | Date | null) => {
     if (!d) return null;
     const date = new Date(typeof d === 'string' && !d.includes('T') ? d + 'T00:00:00' : d);
-    if (isPast(date) && !isToday(date)) return { label: 'Overdue', color: '#ef4444' };
     if (isToday(date))    return { label: 'Due today',    color: '#f59e0b' };
     if (isTomorrow(date)) return { label: 'Due tomorrow', color: '#f97316' };
+    if (isPast(date))     return { label: 'Overdue',      color: '#ef4444' };
     return { label: `Due ${fmt.date(date)}`, color: '#475569' };
   },
 };

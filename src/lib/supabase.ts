@@ -7,6 +7,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: false }, // Clerk handles auth, not Supabase
 });
 
+let _currentUserId = '';
+export async function setSupabaseUserId(userId: string) {
+  _currentUserId = userId;
+  await supabase.rpc('set_user_context', { uid: userId }).then();
+}
+export function getSupabaseUserId() {
+  return _currentUserId;
+}
+
 // Run this SQL in Supabase → SQL Editor to create all tables:
 //
 // -- If upgrading an existing DB, run the migration block at the bottom instead.

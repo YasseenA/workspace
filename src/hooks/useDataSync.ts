@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useUser } from '@clerk/clerk-expo';
+import { setSupabaseUserId } from '../lib/supabase';
 import { useAuthStore }       from '../store/auth';
 import { useNotesStore }      from '../store/notes';
 import { useTasksStore }      from '../store/tasks';
@@ -29,17 +30,19 @@ export function useDataSync() {
 
     if (user?.id) {
       const uid = user.id;
-      authStore.loadForUser(uid);
-      canvasStore.loadForUser(uid);
-      Promise.all([
-        notesStore.loadForUser(uid),
-        tasksStore.loadForUser(uid),
-        focusStore.loadForUser(uid),
-        settingsStore.loadForUser(uid),
-        studyBuddyStore.loadForUser(uid),
-        teamsStore.loadForUser(uid),
-        flashcardsStore.loadForUser(uid),
-      ]);
+      setSupabaseUserId(uid).then(() => {
+        authStore.loadForUser(uid);
+        canvasStore.loadForUser(uid);
+        Promise.all([
+          notesStore.loadForUser(uid),
+          tasksStore.loadForUser(uid),
+          focusStore.loadForUser(uid),
+          settingsStore.loadForUser(uid),
+          studyBuddyStore.loadForUser(uid),
+          teamsStore.loadForUser(uid),
+          flashcardsStore.loadForUser(uid),
+        ]);
+      });
     } else {
       authStore.resetAppState();
       notesStore.clear();
