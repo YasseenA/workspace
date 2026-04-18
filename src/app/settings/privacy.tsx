@@ -14,7 +14,7 @@ import { showAlert } from '../../utils/helpers';
 export default function PrivacyScreen() {
   const colors  = useColors();
   const router  = useRouter();
-  const { signOut, openUserProfile } = useClerk();
+  const { signOut } = useClerk();
   const { notes, clear: clearNotes } = useNotesStore();
   const { tasks, clear: clearTasks } = useTasksStore();
   const { disconnect } = useCanvasStore();
@@ -143,14 +143,14 @@ export default function PrivacyScreen() {
             icon={Lock} iconColor="#8b5cf6"
             label="Change Password"
             subtitle="Opens your account security settings"
-            onPress={() => openUserProfile()}
+            onPress={() => router.push('/settings/account')}
             last={false}
           />
           <Row
             icon={Eye} iconColor="#06b6d4"
             label="Active Sessions"
             subtitle="View and revoke active sessions"
-            onPress={() => openUserProfile()}
+            onPress={() => router.push('/settings/account')}
             last
           />
         </Section>
