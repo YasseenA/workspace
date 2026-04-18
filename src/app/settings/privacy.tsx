@@ -14,7 +14,7 @@ import { showAlert } from '../../utils/helpers';
 export default function PrivacyScreen() {
   const colors  = useColors();
   const router  = useRouter();
-  const { signOut } = useClerk();
+  const { signOut, openUserProfile } = useClerk();
   const { notes, clear: clearNotes } = useNotesStore();
   const { tasks, clear: clearTasks } = useTasksStore();
   const { disconnect } = useCanvasStore();
@@ -142,23 +142,15 @@ export default function PrivacyScreen() {
           <Row
             icon={Lock} iconColor="#8b5cf6"
             label="Change Password"
-            subtitle="Managed by Clerk — opens account portal"
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                (window as any).open('https://accounts.clerk.dev/user', '_blank');
-              }
-            }}
+            subtitle="Opens your account security settings"
+            onPress={() => openUserProfile()}
             last={false}
           />
           <Row
             icon={Eye} iconColor="#06b6d4"
             label="Active Sessions"
-            subtitle="View and revoke sessions via Clerk"
-            onPress={() => {
-              if (Platform.OS === 'web') {
-                (window as any).open('https://accounts.clerk.dev/user/security', '_blank');
-              }
-            }}
+            subtitle="View and revoke active sessions"
+            onPress={() => openUserProfile()}
             last
           />
         </Section>
