@@ -101,8 +101,13 @@ export default function AIStudioScreen() {
   const courseMap = React.useMemo(() => new Map(courses.map(c => [c.id, c.name])), [courses]);
   const upcomingAssignments = React.useMemo(() =>
     assignments
-      .filter(a => a.name && a.due_at)
-      .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime()),
+      .filter(a => a.name)
+      .sort((a, b) => {
+        if (!a.due_at && !b.due_at) return 0;
+        if (!a.due_at) return 1;
+        if (!b.due_at) return -1;
+        return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+      }),
     [assignments]
   );
   const selectedAsgn = upcomingAssignments.find(a => a.id === selectedAssignment);
