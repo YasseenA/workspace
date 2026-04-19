@@ -641,6 +641,72 @@ export default function AIStudioScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Assignment dropdown */}
+            {upcomingAssignments.length > 0 && (
+              <View style={{ position: 'relative' as any, zIndex: 10, alignSelf: 'flex-end' }}>
+                <TouchableOpacity
+                  onPress={() => setAssignmentDropdownOpen(!assignmentDropdownOpen)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
+                    borderWidth: 1, borderColor: selectedAsgn ? cur.color : colors.border,
+                    backgroundColor: selectedAsgn ? cur.color + '12' : 'transparent',
+                  }}
+                >
+                  <GraduationCap size={13} color={selectedAsgn ? cur.color : colors.textTertiary} />
+                  <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: selectedAsgn ? cur.color : colors.textSecondary, maxWidth: 180 }}>
+                    {selectedAsgn ? selectedAsgn.name : 'Choose Assignment'}
+                  </Text>
+                  <ChevronDown size={12} color={selectedAsgn ? cur.color : colors.textTertiary} />
+                </TouchableOpacity>
+
+                {assignmentDropdownOpen && isWeb && (
+                  <>
+                    <div
+                      onClick={() => setAssignmentDropdownOpen(false)}
+                      style={{ position: 'fixed', inset: 0, zIndex: 998 } as any}
+                    />
+                    <div style={{
+                      position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                      width: 300, maxHeight: 280, overflowY: 'auto',
+                      background: colors.card, border: `1px solid ${colors.border}`,
+                      borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                      zIndex: 999, padding: 4,
+                    } as any}>
+                      {selectedAssignment && (
+                        <div
+                          onClick={() => { setSelectedAssignment(null); setAssignmentDropdownOpen(false); setContent(''); }}
+                          style={{
+                            padding: '8px 12px', cursor: 'pointer', borderRadius: 10,
+                            fontSize: 12, color: colors.textTertiary, fontStyle: 'italic',
+                          } as any}
+                        >
+                          Clear selection
+                        </div>
+                      )}
+                      {upcomingAssignments.map(a => (
+                        <div
+                          key={a.id}
+                          onClick={() => loadAssignmentContext(a.id)}
+                          style={{
+                            padding: '8px 12px', cursor: 'pointer', borderRadius: 10,
+                            background: selectedAssignment === a.id ? cur.color + '18' : 'transparent',
+                          } as any}
+                          onMouseEnter={(e: any) => { if (selectedAssignment !== a.id) e.currentTarget.style.background = colors.bg; }}
+                          onMouseLeave={(e: any) => { if (selectedAssignment !== a.id) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 500, color: colors.text, marginBottom: 2 } as any}>{a.name}</div>
+                          <div style={{ fontSize: 11, color: colors.textTertiary } as any}>
+                            {courseMap.get(a.course_id) || ''}{a.due_at ? ` · Due ${new Date(a.due_at).toLocaleDateString()}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </View>
+            )}
+
             <Text style={[styles.inputLabel, { color: colors.textTertiary }]}>YOUR CONTENT</Text>
 
             <View style={[styles.textareaBox, { backgroundColor: colors.bg, borderColor: colors.border }]}>
@@ -686,96 +752,28 @@ export default function AIStudioScreen() {
               ) : null}
             </View>
 
-            {/* Options + Assignment dropdown row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <View style={[styles.optRow, { flex: 1 }]}>
-                {tool === 'summarize' && (<>
-                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Length:</Text>
-                  {(['short', 'medium', 'long'] as const).map(l => <Pill key={l} label={l} active={summaryLen === l} onPress={() => setSummaryLen(l)} />)}
-                </>)}
-                {tool === 'explain' && (<>
-                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Level:</Text>
-                  {(['beginner', 'intermediate', 'advanced'] as const).map(l => <Pill key={l} label={l} active={explainLvl === l} onPress={() => setExplainLvl(l)} />)}
-                </>)}
-                {tool === 'flashcards' && (<>
-                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Cards:</Text>
-                  {[3, 5, 8, 10].map(n => <Pill key={n} label={`${n}`} active={cardCount === n} onPress={() => setCardCount(n)} />)}
-                </>)}
-                {tool === 'quiz' && (<>
-                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Questions:</Text>
-                  {[3, 5, 10].map(n => <Pill key={n} label={`${n}`} active={quizCount === n} onPress={() => setQuizCount(n)} />)}
-                </>)}
-                {tool === 'writing' && (<>
-                  <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Style:</Text>
-                  {(['clarity', 'formal', 'concise', 'humanize'] as const).map(o => <Pill key={o} label={o} active={writeStyle === o} onPress={() => setWriteStyle(o)} />)}
-                </>)}
-              </View>
-
-              {/* Assignment dropdown */}
-              {upcomingAssignments.length > 0 && (
-                <View style={{ position: 'relative' as any, zIndex: 10 }}>
-                  <TouchableOpacity
-                    onPress={() => setAssignmentDropdownOpen(!assignmentDropdownOpen)}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 6,
-                      paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
-                      borderWidth: 1, borderColor: selectedAsgn ? cur.color : colors.border,
-                      backgroundColor: selectedAsgn ? cur.color + '12' : 'transparent',
-                    }}
-                  >
-                    <GraduationCap size={13} color={selectedAsgn ? cur.color : colors.textTertiary} />
-                    <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: selectedAsgn ? cur.color : colors.textSecondary, maxWidth: 120 }}>
-                      {selectedAsgn ? selectedAsgn.name : 'Assignment'}
-                    </Text>
-                    <ChevronDown size={12} color={selectedAsgn ? cur.color : colors.textTertiary} />
-                  </TouchableOpacity>
-
-                  {assignmentDropdownOpen && isWeb && (
-                    <>
-                      <div
-                        onClick={() => setAssignmentDropdownOpen(false)}
-                        style={{ position: 'fixed', inset: 0, zIndex: 998 } as any}
-                      />
-                      <div style={{
-                        position: 'absolute', top: '100%', right: 0, marginTop: 4,
-                        width: 280, maxHeight: 260, overflowY: 'auto',
-                        background: colors.card, border: `1px solid ${colors.border}`,
-                        borderRadius: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                        zIndex: 999, padding: 4,
-                      } as any}>
-                        {selectedAssignment && (
-                          <div
-                            onClick={() => { setSelectedAssignment(null); setAssignmentDropdownOpen(false); setContent(''); }}
-                            style={{
-                              padding: '8px 12px', cursor: 'pointer', borderRadius: 10,
-                              fontSize: 12, color: colors.textTertiary, fontStyle: 'italic',
-                            } as any}
-                          >
-                            Clear selection
-                          </div>
-                        )}
-                        {upcomingAssignments.map(a => (
-                          <div
-                            key={a.id}
-                            onClick={() => loadAssignmentContext(a.id)}
-                            style={{
-                              padding: '8px 12px', cursor: 'pointer', borderRadius: 10,
-                              background: selectedAssignment === a.id ? cur.color + '18' : 'transparent',
-                            } as any}
-                            onMouseEnter={(e: any) => { if (selectedAssignment !== a.id) e.currentTarget.style.background = colors.bg; }}
-                            onMouseLeave={(e: any) => { if (selectedAssignment !== a.id) e.currentTarget.style.background = 'transparent'; }}
-                          >
-                            <div style={{ fontSize: 13, fontWeight: 500, color: colors.text, marginBottom: 2 } as any}>{a.name}</div>
-                            <div style={{ fontSize: 11, color: colors.textTertiary } as any}>
-                              {courseMap.get(a.course_id) || ''}{a.due_at ? ` · Due ${new Date(a.due_at).toLocaleDateString()}` : ''}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </View>
-              )}
+            {/* Options */}
+            <View style={styles.optRow}>
+              {tool === 'summarize' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Length:</Text>
+                {(['short', 'medium', 'long'] as const).map(l => <Pill key={l} label={l} active={summaryLen === l} onPress={() => setSummaryLen(l)} />)}
+              </>)}
+              {tool === 'explain' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Level:</Text>
+                {(['beginner', 'intermediate', 'advanced'] as const).map(l => <Pill key={l} label={l} active={explainLvl === l} onPress={() => setExplainLvl(l)} />)}
+              </>)}
+              {tool === 'flashcards' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Cards:</Text>
+                {[3, 5, 8, 10].map(n => <Pill key={n} label={`${n}`} active={cardCount === n} onPress={() => setCardCount(n)} />)}
+              </>)}
+              {tool === 'quiz' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Questions:</Text>
+                {[3, 5, 10].map(n => <Pill key={n} label={`${n}`} active={quizCount === n} onPress={() => setQuizCount(n)} />)}
+              </>)}
+              {tool === 'writing' && (<>
+                <Text style={[styles.optLabel, { color: colors.textSecondary }]}>Style:</Text>
+                {(['clarity', 'formal', 'concise', 'humanize'] as const).map(o => <Pill key={o} label={o} active={writeStyle === o} onPress={() => setWriteStyle(o)} />)}
+              </>)}
             </View>
 
             {/* Generate button — always visible because parent is ScrollView */}
