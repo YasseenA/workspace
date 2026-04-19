@@ -30,19 +30,18 @@ export function useDataSync() {
 
     if (user?.id) {
       const uid = user.id;
-      setSupabaseUserId(uid).then(() => {
-        authStore.loadForUser(uid);
-        canvasStore.loadForUser(uid);
-        Promise.all([
-          notesStore.loadForUser(uid),
-          tasksStore.loadForUser(uid),
-          focusStore.loadForUser(uid),
-          settingsStore.loadForUser(uid),
-          studyBuddyStore.loadForUser(uid),
-          teamsStore.loadForUser(uid),
-          flashcardsStore.loadForUser(uid),
-        ]);
-      });
+      setSupabaseUserId(uid);
+      authStore.loadForUser(uid);
+      canvasStore.loadForUser(uid);
+      Promise.all([
+        notesStore.loadForUser(uid),
+        tasksStore.loadForUser(uid),
+        focusStore.loadForUser(uid),
+        settingsStore.loadForUser(uid),
+        studyBuddyStore.loadForUser(uid),
+        teamsStore.loadForUser(uid),
+        flashcardsStore.loadForUser(uid),
+      ]);
     } else {
       authStore.resetAppState();
       notesStore.clear();

@@ -10,7 +10,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
 let _currentUserId = '';
 export async function setSupabaseUserId(userId: string) {
   _currentUserId = userId;
-  await supabase.rpc('set_user_context', { uid: userId }).then();
+  // Best-effort RLS context — may fail if function doesn't exist yet
+  supabase.rpc('set_user_context', { uid: userId }).catch(() => {});
 }
 export function getSupabaseUserId() {
   return _currentUserId;
