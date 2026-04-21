@@ -307,8 +307,7 @@ export default function CanvasScreen() {
                 const courseAssignments = assignments.filter(a => a.course_id === course.id);
                 const upcoming = courseAssignments.filter(a => !a.due_at || new Date(a.due_at) > now);
                 const enrollment = course.enrollments?.[0];
-                const currentScore = enrollment?.computed_current_score;
-                const currentGrade = enrollment?.computed_current_grade;
+                const currentScore = enrollment?.computed_current_score ?? enrollment?.computed_final_score;
                 const gradeColor = currentScore == null ? colors.textTertiary
                   : currentScore >= 90 ? colors.success
                   : currentScore >= 80 ? colors.primary

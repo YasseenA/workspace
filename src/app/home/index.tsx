@@ -577,7 +577,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── Course Grades (Canvas) ── */}
-        {canvasConnected && courses.some(c => c.enrollments?.[0]?.computed_current_score != null) && (
+        {canvasConnected && courses.some(c => (c.enrollments?.[0]?.computed_current_score ?? c.enrollments?.[0]?.computed_final_score) != null) && (
           <>
             <View style={[styles.sectionHeader, { marginTop: 12 }]}>
               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Grades</Text>
@@ -587,11 +587,10 @@ export default function HomeScreen() {
             </View>
             <View style={{ gap: 8, paddingHorizontal: 16 }}>
               {courses
-                .filter(c => c.enrollments?.[0]?.computed_current_score != null)
+                .filter(c => (c.enrollments?.[0]?.computed_current_score ?? c.enrollments?.[0]?.computed_final_score) != null)
                 .slice(0, 6)
                 .map(c => {
-                  const score = c.enrollments![0].computed_current_score!;
-                  const grade = c.enrollments![0].computed_current_grade;
+                  const score = c.enrollments![0].computed_current_score ?? c.enrollments![0].computed_final_score ?? 0;
                   const gc = score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error;
                   return (
                     <TouchableOpacity
