@@ -56,6 +56,18 @@ export const canvas = {
     return res.json();
   },
 
+  getModules: async (token: string, courseId: string | number) => {
+    const res = await fetch(`${getBase()}/api/v1/courses/${courseId}/modules?include[]=items&per_page=50`, { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  getModuleItems: async (token: string, courseId: string | number, moduleId: string | number) => {
+    const res = await fetch(`${getBase()}/api/v1/courses/${courseId}/modules/${moduleId}/items?per_page=50`, { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
   getAllAssignments: async (token: string, courseIds: (string | number)[]) => {
     const results = await Promise.all(courseIds.map(id => canvas.getAssignments(token, id).catch(() => [])));
     return results.flat();
@@ -67,7 +79,8 @@ export const canvas = {
       { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } }
     );
     if (!res.ok) return [];
-    return res.json();
+    const data = await res.json();
+    return data.map((s: any) => ({ ...s, course_id: Number(courseId) }));
   },
 
   getAllSubmissions: async (token: string, courseIds: (string | number)[]) => {

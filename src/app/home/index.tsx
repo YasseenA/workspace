@@ -197,7 +197,7 @@ export default function HomeScreen() {
           if (d <= now) return false;
           if (d.getTime() - now.getTime() >= 7 * 24 * 60 * 60 * 1000) return false;
           const sub = subMap.get(a.id);
-          if (sub && (sub.workflow_state === 'submitted' || sub.workflow_state === 'graded')) return false;
+          if (sub && sub.submitted_at) return false;
           return true;
         })
         .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
@@ -598,7 +598,10 @@ export default function HomeScreen() {
         )}
 
         {/* ── Course Grades (Canvas) ── */}
-        {canvasConnected && courses.some(c => (c.enrollments?.[0]?.computed_current_score ?? c.enrollments?.[0]?.computed_final_score) != null) && (
+        {canvasConnected && courses.some(c => {
+          const e = c.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null);
+          return !!e;
+        }) && (
           <>
             <View style={[styles.sectionHeader, { marginTop: 12 }]}>
               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Grades</Text>
@@ -608,25 +611,24 @@ export default function HomeScreen() {
             </View>
             <View style={{ gap: 8, paddingHorizontal: 16 }}>
               {courses
-                .filter(c => (c.enrollments?.[0]?.computed_current_score ?? c.enrollments?.[0]?.computed_final_score) != null)
+                .filter(c => c.enrollments?.some(e => e.computed_current_score != null || e.computed_final_score != null))
                 .slice(0, 6)
                 .map(c => {
-                  const score = c.enrollments![0].computed_current_score ?? c.enrollments![0].computed_final_score ?? 0;
+                  const enrollment = c.enrollments!.find(e => e.computed_current_score != null || e.computed_final_score != null)!;
+                  const score = enrollment.computed_current_score ?? enrollment.computed_final_score ?? 0;
                   const gc = score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error;
                   return (
                     <TouchableOpacity
                       key={c.id}
-                      onPress={() => router.push('/settings/grades')}
-                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border, position: 'relative' }]}
+                      onPress={() => router.push(`/canvas/course/${c.id}`)}
+                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                     >
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
                         <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
                       </View>
-                      {/* Grade absolutely centered in the row */}
-                      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' } as any}>
-                        <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
-                      </View>
+                      <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
+                      <ChevronRight size={14} color={colors.textTertiary} />
                     </TouchableOpacity>
                   );
                 })}
