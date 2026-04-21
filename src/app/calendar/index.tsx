@@ -27,6 +27,7 @@ interface CalItem {
 }
 
 function toDateKey(d: Date) {
+  if (isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
@@ -59,6 +60,7 @@ export default function CalendarScreen() {
   const itemsByDay = useMemo(() => {
     const map = new Map<string, CalItem[]>();
     const add = (key: string, item: CalItem) => {
+      if (!key) return;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(item);
     };
@@ -84,7 +86,9 @@ export default function CalendarScreen() {
     });
 
     tasks.filter(t => t.dueDate && t.status !== 'done').forEach(t => {
-      const key = toDateKey(new Date(t.dueDate!));
+      const raw = t.dueDate!;
+      const d = new Date(raw.includes('T') ? raw : raw + 'T00:00:00');
+      const key = toDateKey(d);
       add(key, { id: `tk-${t.id}`, title: t.title, kind: 'task', color: '#f59e0b', source: t });
     });
 
