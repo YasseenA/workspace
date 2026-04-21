@@ -33,7 +33,15 @@ export default function TabBar() {
             style={styles.tab}
             activeOpacity={0.7}
           >
-            <View style={[styles.pill, active && { backgroundColor: colors.primary + '1a' }]}>
+            <View style={[
+              styles.pill,
+              active && {
+                backgroundColor: colors.primary + '25',
+                ...(Platform.OS === 'web' ? { boxShadow: `0 0 12px ${colors.primary}50` } as any : {
+                  shadowColor: colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 8,
+                }),
+              },
+            ]}>
               <tab.icon
                 size={20}
                 color={active ? colors.primary : colors.textTertiary}
@@ -43,7 +51,7 @@ export default function TabBar() {
             <Text
               style={[
                 styles.label,
-                { color: active ? colors.primary : colors.textTertiary, fontWeight: active ? '600' : '400' },
+                { color: active ? colors.primary : colors.textTertiary, fontWeight: active ? '700' : '400' },
               ]}
             >
               {tab.label}

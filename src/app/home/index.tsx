@@ -287,27 +287,46 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* ── Study Buddy ── */}
-        <TouchableOpacity
-          onPress={() => router.push('/study-buddy' as any)}
-          style={[styles.buddyCard, { borderColor: '#7c3aed30' }]}
-          activeOpacity={0.85}
-        >
-          {Platform.OS === 'web'
-            ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #7c3aed18 0%, #4338ca10 100%)' }} />
-            : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#7c3aed0d' }} />
-          }
-          <View style={[styles.buddyIconWrap, { backgroundColor: '#7c3aed' }]}>
-            <MessageCircle size={20} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.buddyTitle, { color: colors.text }]}>Study Buddy</Text>
-            <Text style={[styles.buddySub, { color: colors.textTertiary }]}>
-              AI tutor that knows your courses & assignments
-            </Text>
-          </View>
-          <ChevronRight size={16} color="#7c3aed" />
-        </TouchableOpacity>
+        {/* ── Study Buddy + AI Studio row ── */}
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 16 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/study-buddy' as any)}
+            style={[styles.buddyCard, { flex: 1, borderColor: '#7c3aed30', marginHorizontal: 0, marginTop: 0 }]}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'web'
+              ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #7c3aed18 0%, #4338ca10 100%)' }} />
+              : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#7c3aed0d' }} />
+            }
+            <View style={[styles.buddyIconWrap, { backgroundColor: '#7c3aed' }]}>
+              <MessageCircle size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.buddyTitle, { color: colors.text }]}>Study Buddy</Text>
+              <Text style={[styles.buddySub, { color: colors.textTertiary }]}>AI tutor</Text>
+            </View>
+            <ChevronRight size={16} color="#7c3aed" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push('/ai-studio' as any)}
+            style={[styles.buddyCard, { flex: 1, borderColor: '#f59e0b30', marginHorizontal: 0, marginTop: 0 }]}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'web'
+              ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #f59e0b18 0%, #ea580c10 100%)' }} />
+              : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#f59e0b0d' }} />
+            }
+            <View style={[styles.buddyIconWrap, { backgroundColor: '#f59e0b' }]}>
+              <Zap size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.buddyTitle, { color: colors.text }]}>AI Studio</Text>
+              <Text style={[styles.buddySub, { color: colors.textTertiary }]}>Generate content</Text>
+            </View>
+            <ChevronRight size={16} color="#f59e0b" />
+          </TouchableOpacity>
+        </View>
 
         {/* ── AI Daily Brief ── */}
         <View style={[styles.briefCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
