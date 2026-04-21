@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ChevronRight, Clock, Calendar, ArrowRight, Zap, RefreshCw, Search, MessageCircle,
+  Plus, FileText, CheckSquare, Timer, Layers, Mail, X,
 } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
@@ -62,6 +63,7 @@ export default function HomeScreen() {
   const { notificationsEnabled } = useSettingsStore();
   const [refreshing, setRefreshing] = useState(false);
   const [sheetItem, setSheetItem] = useState<SheetItem | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
   const subMap = React.useMemo(() => new Map(submissions.map(s => [s.assignment_id, s])), [submissions]);
 
   const [briefText, setBriefText] = useState('');
@@ -511,6 +513,49 @@ export default function HomeScreen() {
       />
 
       <TabBar />
+
+      {/* FAB overlay */}
+      {fabOpen && (
+        <TouchableOpacity
+          style={styles.fabOverlay}
+          activeOpacity={1}
+          onPress={() => setFabOpen(false)}
+        >
+          <View style={styles.fabMenu}>
+            {[
+              { icon: FileText, label: 'New Note',    color: colors.primary, route: '/notes/editor' },
+              { icon: CheckSquare, label: 'Add Task', color: '#10b981',      route: '/tasks' },
+              { icon: Timer,    label: 'Focus',       color: '#ec4899',      route: '/focus' },
+              { icon: Layers,   label: 'Flashcards',  color: '#f97316',      route: '/flashcards' },
+              { icon: Mail,     label: 'Email Draft',  color: '#3b82f6',      route: '/email' },
+            ].map(({ icon: Icon, label, color, route }) => (
+              <TouchableOpacity
+                key={label}
+                onPress={() => { setFabOpen(false); router.push(route as any); }}
+                style={[styles.fabItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.fabItemIcon, { backgroundColor: color + '18' }]}>
+                  <Icon size={18} color={color} />
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* FAB button */}
+      <TouchableOpacity
+        onPress={() => setFabOpen(v => !v)}
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        activeOpacity={0.85}
+      >
+        {fabOpen
+          ? <X size={24} color="#fff" strokeWidth={2.5} />
+          : <Plus size={24} color="#fff" strokeWidth={2.5} />
+        }
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -599,4 +644,32 @@ const styles = StyleSheet.create({
   briefIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   briefTitle: { fontSize: 13, fontWeight: '700' },
   briefBody: { fontSize: 13, lineHeight: 21 },
+
+  fab: {
+    position: 'absolute', bottom: 90, right: 20,
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35, shadowRadius: 10, elevation: 8,
+    zIndex: 1001,
+  },
+  fabOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    paddingBottom: 160,
+    paddingRight: 20,
+    zIndex: 1000,
+    ...(Platform.OS === 'web' ? { position: 'fixed' as any } : {}),
+  },
+  fabMenu: { gap: 8, alignItems: 'flex-end' },
+  fabItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 16,
+    borderRadius: 16, borderWidth: 0.5,
+    minWidth: 180,
+  },
+  fabItemIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 });
