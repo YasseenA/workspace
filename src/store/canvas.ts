@@ -106,19 +106,23 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   },
 
   sync: async () => {
-    const { token, courses, userId } = get();
+    const { token, userId } = get();
     if (!token) throw new Error('Not connected');
     set({ isSyncing: true });
     try {
-      const courseIds = courses.map(c => c.id);
+      const freshCourses = await canvas.getCourses(token);
+      const activeCourses = Array.isArray(freshCourses)
+        ? freshCourses.filter((c: CanvasCourse) => c.name && !c.name.startsWith('Sandbox'))
+        : get().courses;
+      const courseIds = activeCourses.map((c: CanvasCourse) => c.id);
       const [assignments, submissions] = await Promise.all([
         canvas.getAllAssignments(token, courseIds),
         canvas.getAllSubmissions(token, courseIds),
       ]);
       const now = new Date().toISOString();
-      set({ assignments, submissions, lastSync: now, isSyncing: false });
+      set({ courses: activeCourses, assignments, submissions, lastSync: now, isSyncing: false });
       if (userId) supabase.from('profiles').update({
-        canvas_assignments: assignments, canvas_submissions: submissions, canvas_last_sync: now,
+        canvas_courses: activeCourses, canvas_assignments: assignments, canvas_submissions: submissions, canvas_last_sync: now,
       }).eq('user_id', userId).then();
     } catch (e: any) {
       if (e.message === 'TOKEN_EXPIRED') {
