@@ -5,13 +5,14 @@ import { useRouter } from 'expo-router';
 import {
   User, Bell, Moon, Shield, HelpCircle, LogOut,
   ChevronRight, Bot, Link2, Timer, BookOpen,
-  Star, ExternalLink, TrendingUp, CheckSquare,
+  Star, ExternalLink, TrendingUp, CheckSquare, Calendar, RotateCcw,
 } from 'lucide-react-native';
 import { useUser, useClerk } from '@clerk/clerk-expo';
 import { useAuthStore }    from '../../store/auth';
 import { GraduationCap }   from 'lucide-react-native';
 import { useCanvasStore }  from '../../store/canvas';
 import { useTeamsStore }   from '../../store/teams';
+import { useGCalStore }    from '../../store/gcal';
 import { ACCENT_COLORS }   from '../../store/settings';
 import { useNotesStore }   from '../../store/notes';
 import { useTasksStore }   from '../../store/tasks';
@@ -23,6 +24,7 @@ import { useColors } from '../../lib/theme';
 import { initials, showAlert } from '../../utils/helpers';
 import { getKey } from '../../lib/keystore';
 import { requestPermission, fireTestNotification } from '../../lib/notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -36,6 +38,7 @@ export default function SettingsScreen() {
   const { sessions, totalFocusMinutes }      = useFocusStore();
   const { darkMode, toggleDarkMode, notificationsEnabled, setNotificationsEnabled, accentColor, setAccentColor } = useSettingsStore();
   const { connected: teamsConnected } = useTeamsStore();
+  const { connected: gcalConnected } = useGCalStore();
 
   const focusHrs    = Math.round(totalFocusMinutes / 60 * 10) / 10;
   const pendingTasks = tasks.filter(t => t.status !== 'done').length;
@@ -168,6 +171,12 @@ export default function SettingsScreen() {
               onPress={() => router.push('/teams')}
             />
             <Row
+              icon={Calendar} iconColor="#4285f4"
+              label="Google Calendar"
+              value={gcalConnected ? 'Connected' : 'Not connected'}
+              onPress={() => router.push('/calendar')}
+            />
+            <Row
               icon={Bot} iconColor="#8b5cf6"
               label="Claude AI"
               value="Active"
@@ -261,6 +270,15 @@ export default function SettingsScreen() {
           </Section>
 
           <Section title="ABOUT">
+            <Row icon={RotateCcw} iconColor="#7c3aed" label="Replay App Tour" onPress={() => {
+              const TOUR_KEY = 'workspace_tour_complete';
+              if (Platform.OS === 'web') {
+                try { localStorage.removeItem(TOUR_KEY); } catch {}
+              } else {
+                AsyncStorage.removeItem(TOUR_KEY);
+              }
+              showAlert('Tour Reset', 'The app tour will show next time you visit the home screen.');
+            }} />
             <Row icon={Star}         iconColor="#f59e0b" label="Rate Workspace"  onPress={() => showAlert('Thanks for using Workspace! ⭐')} />
             <Row icon={HelpCircle}   iconColor="#10b981" label="Help & Support"  onPress={() => showAlert('Help & Support', 'Email: support@workspace.app')} />
             <Row icon={ExternalLink} iconColor={colors.textTertiary} label="Version" value="1.0.0" last />
