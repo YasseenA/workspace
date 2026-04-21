@@ -77,10 +77,8 @@ export default function HomeScreen() {
   const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
-    if (hasOnboarded) {
-      shouldShowTour().then(show => { if (show) setShowTour(true); });
-    }
-  }, [hasOnboarded]);
+    shouldShowTour().then(show => { if (show) setShowTour(true); });
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -147,7 +145,11 @@ export default function HomeScreen() {
         if (perm !== 'granted') return;
         const items = [
           ...assignments
-            .filter(a => a.due_at)
+            .filter(a => {
+              if (!a.due_at) return false;
+              const sub = subMap.get(a.id);
+              return !(sub && (sub.workflow_state === 'submitted' || sub.workflow_state === 'graded'));
+            })
             .map(a => ({
               id: `canvas-${a.id}`,
               title: a.name,
@@ -192,7 +194,11 @@ export default function HomeScreen() {
         .filter(a => {
           if (!a.due_at) return false;
           const d = new Date(a.due_at);
-          return d > now && d.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000;
+          if (d <= now) return false;
+          if (d.getTime() - now.getTime() >= 7 * 24 * 60 * 60 * 1000) return false;
+          const sub = subMap.get(a.id);
+          if (sub && (sub.workflow_state === 'submitted' || sub.workflow_state === 'graded')) return false;
+          return true;
         })
         .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
     : [];
@@ -273,6 +279,21 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
+
+        {/* ── Connect Canvas banner ── */}
+        {!canvasConnected && (
+          <TouchableOpacity
+            onPress={() => router.push('/canvas')}
+            style={[styles.alert, { backgroundColor: '#7c3aed12', borderColor: '#7c3aed30' }]}
+          >
+            <Text style={{ fontSize: 16 }}>🎓</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Connect Canvas to get started</Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>See grades, assignments, and deadlines all in one place</Text>
+            </View>
+            <ArrowRight size={14} color={colors.primary} />
+          </TouchableOpacity>
+        )}
 
         {/* ── Overdue alert ── */}
         {overdueTasks.length > 0 && (
