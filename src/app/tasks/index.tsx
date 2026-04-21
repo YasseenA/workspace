@@ -191,7 +191,7 @@ function CanvasRow({ item, colors, submissionMap, courseMap, onNavigate }: Canva
   const sub         = submissionMap.get(item.id);
   const due         = item.due_at ? fmt.dueDate(item.due_at) : null;
   const course      = courseMap.get(item.course_id);
-  const isSubmitted = sub && (sub.workflow_state === 'submitted' || sub.workflow_state === 'graded');
+  const isSubmitted = sub && (sub.submitted_at || sub.workflow_state === 'submitted' || sub.workflow_state === 'graded');
   const isGraded    = sub?.workflow_state === 'graded';
   const isMissing   = sub?.missing;
   const isUrgent    = item.due_at && (new Date(item.due_at).getTime() - Date.now()) < 2 * 86400000 && !isSubmitted;
@@ -361,12 +361,12 @@ export default function TasksScreen() {
     }
     if (filter === 'todo') {
       return assignments
-        .filter(a => { const s = submissionMap.get(a.id); return !s || (s.workflow_state !== 'submitted' && s.workflow_state !== 'graded'); })
+        .filter(a => { const s = submissionMap.get(a.id); return !s || (!s.submitted_at && s.workflow_state !== 'submitted' && s.workflow_state !== 'graded'); })
         .sort((a, b) => (a.due_at && b.due_at ? new Date(a.due_at).getTime() - new Date(b.due_at).getTime() : 0));
     }
     if (filter === 'done') {
       return assignments
-        .filter(a => { const s = submissionMap.get(a.id); return s && (s.workflow_state === 'submitted' || s.workflow_state === 'graded'); });
+        .filter(a => { const s = submissionMap.get(a.id); return s && (s.submitted_at || s.workflow_state === 'submitted' || s.workflow_state === 'graded'); });
     }
     if (filter === 'all') {
       return [...assignments].sort((a, b) => (a.due_at && b.due_at ? new Date(a.due_at).getTime() - new Date(b.due_at).getTime() : 0));

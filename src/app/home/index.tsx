@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  ChevronRight, Clock, Calendar, ArrowRight, Zap, RefreshCw, Search,
+  ChevronRight, Clock, Calendar, ArrowRight, Zap, RefreshCw, Search, MessageCircle,
 } from 'lucide-react-native';
 import { useUser } from '@clerk/clerk-expo';
 import { useNotesStore } from '../../store/notes';
@@ -167,7 +167,12 @@ export default function HomeScreen() {
   const dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const canvasDueToday = canvasConnected
-    ? assignments.filter(a => a.due_at && new Date(a.due_at).toDateString() === now.toDateString())
+    ? assignments.filter(a => {
+        if (!a.due_at || new Date(a.due_at).toDateString() !== now.toDateString()) return false;
+        const sub = subMap.get(a.id);
+        if (sub && sub.submitted_at) return false;
+        return true;
+      })
     : [];
 
   const nextWeek = canvasConnected
@@ -282,6 +287,28 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
+        {/* ── Study Buddy ── */}
+        <TouchableOpacity
+          onPress={() => router.push('/study-buddy' as any)}
+          style={[styles.buddyCard, { borderColor: '#7c3aed30' }]}
+          activeOpacity={0.85}
+        >
+          {Platform.OS === 'web'
+            ? <div style={{ position: 'absolute', inset: 0, borderRadius: 18, background: 'linear-gradient(120deg, #7c3aed18 0%, #4338ca10 100%)' }} />
+            : <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 18, backgroundColor: '#7c3aed0d' }} />
+          }
+          <View style={[styles.buddyIconWrap, { backgroundColor: '#7c3aed' }]}>
+            <MessageCircle size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.buddyTitle, { color: colors.text }]}>Study Buddy</Text>
+            <Text style={[styles.buddySub, { color: colors.textTertiary }]}>
+              AI tutor that knows your courses & assignments
+            </Text>
+          </View>
+          <ChevronRight size={16} color="#7c3aed" />
+        </TouchableOpacity>
+
         {/* ── AI Daily Brief ── */}
         <View style={[styles.briefCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.briefHeader}>
@@ -371,6 +398,45 @@ export default function HomeScreen() {
           </>
         )}
 
+        {/* ── My Classes ── */}
+        {canvasConnected && courses.length > 0 && (
+          <>
+            <View style={[styles.sectionHeader, { marginTop: 12 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Classes</Text>
+              <TouchableOpacity onPress={() => router.push('/settings/grades')} style={styles.seeAll}>
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>Calculator</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ gap: 8, paddingHorizontal: 16 }}>
+              {courses.map(c => {
+                const enrollment = c.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null);
+                const score = enrollment?.computed_current_score ?? enrollment?.computed_final_score ?? null;
+                const gc = score != null
+                  ? (score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error)
+                  : colors.textTertiary;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => router.push(`/canvas/course/${c.id}`)}
+                    style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
+                    </View>
+                    {score != null ? (
+                      <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
+                    ) : (
+                      <Text style={{ fontSize: 13, color: colors.textTertiary }}>No grade</Text>
+                    )}
+                    <ChevronRight size={14} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         {/* ── Next 7 Days ── */}
         {nextWeek.length > 0 && (
           <>
@@ -411,45 +477,6 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               );
             })}
-          </>
-        )}
-
-        {/* ── My Grades ── */}
-        {canvasConnected && courses.some(c => {
-          const e = c.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null);
-          return !!e;
-        }) && (
-          <>
-            <View style={[styles.sectionHeader, { marginTop: 12 }]}>
-              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Grades</Text>
-              <TouchableOpacity onPress={() => router.push('/settings/grades')} style={styles.seeAll}>
-                <Text style={[styles.seeAllText, { color: colors.primary }]}>Calculator</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ gap: 8, paddingHorizontal: 16 }}>
-              {courses
-                .filter(c => c.enrollments?.some(e => e.computed_current_score != null || e.computed_final_score != null))
-                .slice(0, 6)
-                .map(c => {
-                  const enrollment = c.enrollments!.find(e => e.computed_current_score != null || e.computed_final_score != null)!;
-                  const score = enrollment.computed_current_score ?? enrollment.computed_final_score ?? 0;
-                  const gc = score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error;
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      onPress={() => router.push(`/canvas/course/${c.id}`)}
-                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
-                        <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
-                      </View>
-                      <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
-                      <ChevronRight size={14} color={colors.textTertiary} />
-                    </TouchableOpacity>
-                  );
-                })}
-            </View>
           </>
         )}
 
@@ -532,6 +559,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 16, marginBottom: 8,
     borderRadius: 20, borderWidth: 0.5,
   },
+
+  buddyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 8, marginTop: 16,
+    borderRadius: 18, borderWidth: 1, padding: 14,
+    overflow: 'hidden', position: 'relative',
+  },
+  buddyIconWrap: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  buddyTitle: { fontSize: 15, fontWeight: '700' },
+  buddySub: { fontSize: 12, marginTop: 2 },
 
   briefCard: {
     marginHorizontal: 16, marginBottom: 8, marginTop: 16,
