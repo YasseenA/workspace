@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileText, Link, CheckCircle2, Circle, Clock } from 'lucide-react-native';
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, FileText, Link, CheckCircle2, Circle, Clock, TrendingUp, Zap } from 'lucide-react-native';
 import { useCanvasStore } from '../../../store/canvas';
 import { useColors } from '../../../lib/theme';
 import { canvas } from '../../../lib/canvas';
@@ -40,9 +40,31 @@ export default function CourseDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
   const [tab, setTab] = useState<'modules' | 'assignments' | 'grades'>('modules');
+  const [targetGrade, setTargetGrade] = useState<number | null>(null);
 
   const enrollment = course?.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null) || course?.enrollments?.[0];
   const score = enrollment?.computed_current_score ?? enrollment?.computed_final_score;
+
+  const targetCalc = useMemo(() => {
+    if (targetGrade == null) return null;
+    let earnedSoFar = 0, possibleSoFar = 0, remainingPossible = 0;
+    for (const a of courseAssignments) {
+      const sub = subMap.get(a.id);
+      const pts = a.points_possible ?? 0;
+      if (pts <= 0) continue;
+      if (sub?.score != null && sub.workflow_state === 'graded') {
+        earnedSoFar += sub.score;
+        possibleSoFar += pts;
+      } else {
+        remainingPossible += pts;
+      }
+    }
+    const totalPossible = possibleSoFar + remainingPossible;
+    if (totalPossible === 0 || remainingPossible === 0) return null;
+    const needed = (targetGrade / 100) * totalPossible - earnedSoFar;
+    const neededPct = (needed / remainingPossible) * 100;
+    return { neededPct, remainingPossible, totalPossible };
+  }, [targetGrade, courseAssignments, subMap]);
 
   useEffect(() => {
     if (!token || !id) { setLoading(false); return; }
@@ -249,6 +271,90 @@ export default function CourseDetailScreen() {
                 <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 4 }}>Current Grade</Text>
               </View>
             )}
+
+            {/* What score do I need? */}
+            <View style={[styles.calcCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={14} color={colors.primary} />
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>What score do I need?</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {[
+                  { pct: 93, label: 'A (93%)' },
+                  { pct: 90, label: 'A- (90%)' },
+                  { pct: 83, label: 'B (83%)' },
+                  { pct: 80, label: 'B- (80%)' },
+                  { pct: 73, label: 'C (73%)' },
+                  { pct: 70, label: 'C- (70%)' },
+                ].map(({ pct, label }) => (
+                  <TouchableOpacity
+                    key={pct}
+                    onPress={() => setTargetGrade(targetGrade === pct ? null : pct)}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1,
+                      borderColor: targetGrade === pct ? colors.primary : colors.border,
+                      backgroundColor: targetGrade === pct ? colors.primary : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: targetGrade === pct ? '#fff' : colors.textSecondary }}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {targetCalc && (
+                <View style={{
+                  borderRadius: 14, borderWidth: 1, padding: 14, alignItems: 'center',
+                  backgroundColor: targetCalc.neededPct > 100 ? '#ef444415' : targetCalc.neededPct <= 0 ? '#10b98115' : '#f59e0b15',
+                  borderColor: targetCalc.neededPct > 100 ? '#ef444440' : targetCalc.neededPct <= 0 ? '#10b98140' : '#f59e0b40',
+                }}>
+                  {targetCalc.neededPct > 100 ? (
+                    <>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#ef4444' }}>Not achievable</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4, textAlign: 'center' }}>
+                        Even scoring 100% on remaining work ({targetCalc.remainingPossible} pts) isn't enough for {targetGrade}%.
+                      </Text>
+                    </>
+                  ) : targetCalc.neededPct <= 0 ? (
+                    <>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#10b981' }}>Already achieved!</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                        Your current grade already meets {targetGrade}%.
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 13, color: colors.textSecondary }}>You need to average</Text>
+                      <Text style={{
+                        fontSize: 36, fontWeight: '800', letterSpacing: -1,
+                        color: targetCalc.neededPct >= 90 ? '#f59e0b' : '#10b981',
+                      }}>
+                        {Math.round(targetCalc.neededPct)}%
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                        on remaining {targetCalc.remainingPossible} pts to finish at {targetGrade}%
+                      </Text>
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Full calculator link */}
+            <TouchableOpacity
+              onPress={() => router.push('/settings/grades')}
+              style={[styles.calcLink, { backgroundColor: colors.primaryLight, borderColor: colors.primary + '30' }]}
+            >
+              <TrendingUp size={16} color={colors.primary} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary, flex: 1 }}>Full Grade Calculator</Text>
+              <Text style={{ fontSize: 12, color: colors.primary }}>What-if scenarios, GPA & more</Text>
+              <ChevronRight size={14} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Graded assignments */}
             {courseAssignments
               .filter(a => {
                 const sub = subMap.get(a.id);
@@ -299,4 +405,6 @@ const styles = StyleSheet.create({
 
   gradeOverview: { alignItems: 'center', paddingVertical: 32, borderRadius: 16, borderWidth: 0.5, marginBottom: 16 },
   gradeItem: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 0.5, padding: 14, marginBottom: 8 },
+  calcCard: { borderRadius: 18, borderWidth: 0.5, padding: 16, marginBottom: 12 },
+  calcLink: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
 });
