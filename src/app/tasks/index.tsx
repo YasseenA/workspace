@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import {
   Plus, CheckCircle, Circle, Trash2,
   Flag, X, BookOpen, ChevronRight, AlertCircle, Timer, ChevronDown,
+  Calendar, ChevronLeft,
 } from 'lucide-react-native';
 import { useTasksStore, Priority, Task, Subtask } from '../../store/tasks';
 import { useCanvasStore } from '../../store/canvas';
@@ -240,6 +241,80 @@ function CanvasRow({ item, colors, submissionMap, courseMap, onNavigate }: Canva
   );
 }
 
+/* ── MiniCalendar — inline date picker ── */
+function MiniCalendar({ value, onChange, colors }: { value: string; onChange: (d: string) => void; colors: any }) {
+  const today = new Date();
+  const selected = value ? new Date(value + 'T00:00:00') : today;
+  const [viewYear, setViewYear] = useState(selected.getFullYear());
+  const [viewMonth, setViewMonth] = useState(selected.getMonth());
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const weeks: (number | null)[][] = [];
+  let week: (number | null)[] = Array(firstDow).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    week.push(d);
+    if (week.length === 7) { weeks.push(week); week = []; }
+  }
+  if (week.length) { while (week.length < 7) week.push(null); weeks.push(week); }
+
+  const monthLabel = new Date(viewYear, viewMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  const isToday = (d: number) => d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+  const isSelected = (d: number) => value === `${viewYear}-${pad(viewMonth + 1)}-${pad(d)}`;
+
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+
+  return (
+    <View style={{ borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg, padding: 12, marginBottom: 12 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <ChevronLeft size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{monthLabel}</Text>
+        <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((l, i) => (
+          <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textTertiary }}>{l}</Text>
+          </View>
+        ))}
+      </View>
+      {weeks.map((wk, wi) => (
+        <View key={wi} style={{ flexDirection: 'row' }}>
+          {wk.map((day, di) => (
+            <TouchableOpacity
+              key={di}
+              disabled={!day}
+              onPress={() => day && onChange(`${viewYear}-${pad(viewMonth + 1)}-${pad(day)}`)}
+              style={{
+                flex: 1, alignItems: 'center', justifyContent: 'center',
+                height: 34, borderRadius: 17,
+                backgroundColor: day && isSelected(day) ? colors.primary : day && isToday(day) ? colors.primary + '15' : 'transparent',
+              }}
+            >
+              {day ? (
+                <Text style={{
+                  fontSize: 13,
+                  fontWeight: isSelected(day) || isToday(day) ? '700' : '400',
+                  color: isSelected(day) ? '#fff' : isToday(day) ? colors.primary : colors.text,
+                }}>
+                  {day}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /* ── Main screen ── */
 export default function TasksScreen() {
   const router = useRouter();
@@ -255,6 +330,7 @@ export default function TasksScreen() {
   const [newPriority, setNewPriority] = useState<Priority>('medium');
   const [newDue,      setNewDue]      = useState('');
   const [saving,      setSaving]      = useState(false);
+  const [showCal,     setShowCal]     = useState(false);
 
   const submissionMap = useMemo(() => {
     const map = new Map<number, typeof submissions[0]>();
@@ -306,7 +382,7 @@ export default function TasksScreen() {
     setSaving(true);
     try {
       createTask({ title: newTitle.trim(), description: newDesc.trim() || undefined, priority: newPriority, dueDate: newDue || undefined, subtasks: newSubtasks.filter(s => s.title.trim()) });
-      setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewDue(''); setNewSubtasks([]);
+      setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewDue(''); setNewSubtasks([]); setShowCal(false);
       setShowAdd(false);
     } finally { setSaving(false); }
   };
@@ -466,28 +542,36 @@ export default function TasksScreen() {
             onChangeText={setNewDesc}
             multiline
           />
-          {Platform.OS === 'web' ? (
-            // @ts-ignore
-            <input
-              type="date"
+          <TouchableOpacity
+            onPress={() => {
+              if (!newDue) {
+                const t = new Date();
+                const pad = (n: number) => String(n).padStart(2, '0');
+                setNewDue(`${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`);
+              }
+              setShowCal(v => !v);
+            }}
+            style={[styles.modalInput, { borderColor: colors.border, backgroundColor: colors.bg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+          >
+            <Text style={{ fontSize: 15, color: newDue ? colors.text : colors.textTertiary }}>
+              {newDue
+                ? new Date(newDue + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+                : 'Due date (tap to pick)'}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {newDue ? (
+                <TouchableOpacity onPress={() => { setNewDue(''); setShowCal(false); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={14} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ) : null}
+              <Calendar size={16} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+          {showCal && (
+            <MiniCalendar
               value={newDue}
-              onChange={(e: any) => setNewDue(e.target.value)}
-              style={{
-                borderRadius: 12, borderWidth: 1, borderStyle: 'solid',
-                padding: '12px 14px', fontSize: 15, marginBottom: 16,
-                width: '100%', boxSizing: 'border-box',
-                background: 'transparent', outline: 'none',
-                borderColor: colors.border, color: colors.text,
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              } as any}
-            />
-          ) : (
-            <TextInput
-              style={[styles.modalInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]}
-              placeholder="Due date  YYYY-MM-DD"
-              placeholderTextColor={colors.textTertiary}
-              value={newDue}
-              onChangeText={setNewDue}
+              onChange={(d) => { setNewDue(d); setShowCal(false); }}
+              colors={colors}
             />
           )}
 
