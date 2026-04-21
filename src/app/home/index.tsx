@@ -399,7 +399,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── My Classes ── */}
-        {canvasConnected && courses.length > 0 && (
+        {canvasConnected && courses.filter(c => c.enrollments && c.enrollments.length > 0).length > 0 && (
           <>
             <View style={[styles.sectionHeader, { marginTop: 12 }]}>
               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Classes</Text>
@@ -408,31 +408,33 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ gap: 8, paddingHorizontal: 16 }}>
-              {courses.map(c => {
-                const enrollment = c.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null);
-                const score = enrollment?.computed_current_score ?? enrollment?.computed_final_score ?? null;
-                const gc = score != null
-                  ? (score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error)
-                  : colors.textTertiary;
-                return (
-                  <TouchableOpacity
-                    key={c.id}
-                    onPress={() => router.push(`/canvas/course/${c.id}`)}
-                    style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
-                    </View>
-                    {score != null ? (
-                      <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
-                    ) : (
-                      <Text style={{ fontSize: 13, color: colors.textTertiary }}>No grade</Text>
-                    )}
-                    <ChevronRight size={14} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                );
-              })}
+              {courses
+                .filter(c => c.enrollments && c.enrollments.length > 0)
+                .map(c => {
+                  const enrollment = c.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null);
+                  const score = enrollment?.computed_current_score ?? enrollment?.computed_final_score ?? null;
+                  const gc = score != null
+                    ? (score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error)
+                    : colors.textTertiary;
+                  return (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => router.push(`/canvas/course/${c.id}`)}
+                      style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{c.name}</Text>
+                        <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>{c.course_code}</Text>
+                      </View>
+                      {score != null ? (
+                        <Text style={{ fontSize: 20, fontWeight: '800', color: gc }}>{Math.round(score)}%</Text>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: colors.textTertiary }}>No grade</Text>
+                      )}
+                      <ChevronRight size={14} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  );
+                })}
             </View>
           </>
         )}
