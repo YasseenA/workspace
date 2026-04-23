@@ -102,7 +102,13 @@ export default function HomeScreen() {
         .filter(a => a.due_at && new Date(a.due_at) > now && new Date(a.due_at) <= sevenDays)
         .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
         .slice(0, 4)
-        .map(a => `${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})`)
+        .map(a => {
+          const sub = subMap.get(a.id);
+          const status = sub?.workflow_state === 'graded' ? ' [GRADED]'
+            : sub?.workflow_state === 'submitted' ? ' [TURNED IN]'
+            : ' [NOT SUBMITTED]';
+          return `${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})${status}`;
+        })
         .join(', ');
       const overdue = tasks.filter(t =>
         t.status !== 'done' && t.dueDate && new Date(t.dueDate) < now

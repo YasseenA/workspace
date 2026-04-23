@@ -114,7 +114,7 @@ export async function streamChat(
   if (!key) throw new Error('No AI key set. Go to Settings → AI Keys to add yours.');
   const provider = getProvider();
   if (provider === 'openai') {
-    const openaiMessages = [{ role: 'system', content: messages[0]?.content || '' }, ...messages.slice(1)];
+    const openaiMessages = [{ role: 'system' as const, content: system }, ...messages];
     const res = await fetch(OPENAI_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },

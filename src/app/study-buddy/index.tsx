@@ -57,12 +57,22 @@ function buildSystemPrompt(
   const now = new Date();
   const twoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
 
+  const subMap = new Map(submissions.map((s: any) => [s.assignment_id, s]));
+
   // Canvas upcoming
   const upcomingCanvas = assignments
     .filter(a => a.due_at && new Date(a.due_at) > now && new Date(a.due_at) <= twoWeeks)
     .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
     .slice(0, 6)
-    .map(a => `- [Canvas] ${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})`)
+    .map(a => {
+      const sub = subMap.get(a.id);
+      let status = '';
+      if (sub?.workflow_state === 'graded') status = ` [GRADED: ${sub.score}/${a.points_possible}]`;
+      else if (sub?.workflow_state === 'submitted') status = ' [TURNED IN]';
+      else if (sub?.workflow_state === 'pending_review') status = ' [TURNED IN - pending review]';
+      else status = ' [NOT SUBMITTED]';
+      return `- [Canvas] ${a.name} (due ${new Date(a.due_at!).toLocaleDateString()})${status}`;
+    })
     .join('\n');
 
   // Teams upcoming
@@ -89,8 +99,6 @@ function buildSystemPrompt(
   const coursesList = courses.map(c => c.name).join(', ') || 'No Canvas courses';
   const teamsCourseList = [...new Set(teamsAssignments.map((a: any) => a.className))].join(', ');
 
-  // Grade summary (graded Canvas submissions)
-  const subMap = new Map(submissions.map((s: any) => [s.assignment_id, s]));
   const gradeSummary = courses
     .map(c => {
       const enroll = c.enrollments?.[0];
