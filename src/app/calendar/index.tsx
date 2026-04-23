@@ -31,6 +31,12 @@ function toDateKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function safeTime(d: Date): string | undefined {
+  if (isNaN(d.getTime())) return undefined;
+  try { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  catch { return undefined; }
+}
+
 export default function CalendarScreen() {
   const router = useRouter();
   const colors = useColors();
@@ -70,7 +76,7 @@ export default function CalendarScreen() {
       const key = toDateKey(new Date(a.due_at));
       add(key, {
         id: `c-${a.id}`, title: a.name, kind: 'canvas', color: '#10b981',
-        time: new Date(a.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: safeTime(new Date(a.due_at)),
         source: a,
       });
     });
@@ -80,7 +86,7 @@ export default function CalendarScreen() {
       const key = toDateKey(new Date(a.dueDateTime));
       add(key, {
         id: `t-${a.id}`, title: a.displayName, kind: 'teams', color: '#5865f2',
-        time: new Date(a.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: safeTime(new Date(a.dueDateTime)),
         source: a,
       });
     });
@@ -96,7 +102,7 @@ export default function CalendarScreen() {
       const key = toDateKey(new Date(e.start));
       add(key, {
         id: `gc-${e.id}`, title: e.title, kind: 'gcal' as any, color: '#4285f4',
-        time: e.allDay ? undefined : new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: e.allDay ? undefined : safeTime(new Date(e.start)),
         source: e,
       });
     });

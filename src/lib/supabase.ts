@@ -11,7 +11,7 @@ let _currentUserId = '';
 export async function setSupabaseUserId(userId: string) {
   _currentUserId = userId;
   // Best-effort RLS context — may fail if function doesn't exist yet
-  supabase.rpc('set_user_context', { uid: userId }).catch(() => {});
+  supabase.rpc('set_user_context', { uid: userId }).then(() => {}, () => {});
 }
 export function getSupabaseUserId() {
   return _currentUserId;
