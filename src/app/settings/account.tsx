@@ -3,7 +3,7 @@ import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import { UserProfile } from '@clerk/clerk-expo';
+import { UserProfile } from '@clerk/clerk-react';
 import { useColors } from '../../lib/theme';
 
 export default function AccountScreen() {

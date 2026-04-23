@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 
 export type Priority = 'low' | 'medium' | 'high' | 'critical';
 export type Status   = 'todo' | 'in_progress' | 'done';
@@ -54,12 +54,12 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     set(s => ({ tasks: [task, ...s.tasks] }));
-    if (userId) supabase.from('tasks').insert({
+    if (userId) bgSync(supabase.from('tasks').insert({
       id: task.id, user_id: userId, title: task.title, description: task.description,
       priority: task.priority, status: task.status, due_date: task.dueDate || null,
       canvas_id: task.canvasId || null, tags: task.tags, subtasks: task.subtasks,
       created_at: task.createdAt, updated_at: task.updatedAt,
-    }).then();
+    }));
     return task;
   },
 
@@ -75,14 +75,14 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
       if (data.dueDate !== undefined)     patch.due_date    = data.dueDate || null;
       if (data.tags !== undefined)        patch.tags        = data.tags;
       if (data.subtasks !== undefined)    patch.subtasks    = data.subtasks;
-      supabase.from('tasks').update(patch).eq('id', id).eq('user_id', userId).then();
+      bgSync(supabase.from('tasks').update(patch).eq('id', id).eq('user_id', userId));
     }
   },
 
   deleteTask: (id) => {
     const userId = get().userId;
     set(s => ({ tasks: s.tasks.filter(t => t.id !== id) }));
-    if (userId) supabase.from('tasks').delete().eq('id', id).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('tasks').delete().eq('id', id).eq('user_id', userId));
   },
 
   completeTask: (id) => get().updateTask(id, { status: 'done' }),
@@ -94,16 +94,16 @@ export const useTasksStore = create<TasksState>()((set, get) => ({
       description: a.description?.replace(/<[^>]*>/g, '').slice(0, 200),
       priority: 'medium' as Priority, status: 'todo' as Status,
       dueDate: a.due_at || undefined, canvasId: String(a.id),
-      tags: ['canvas'], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      tags: ['canvas'], subtasks: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     }));
     if (newTasks.length) {
       set(s => ({ tasks: [...newTasks, ...s.tasks] }));
       const userId = get().userId;
-      if (userId) supabase.from('tasks').insert(newTasks.map(t => ({
+      if (userId) bgSync(supabase.from('tasks').insert(newTasks.map(t => ({
         id: t.id, user_id: userId, title: t.title, description: t.description,
         priority: t.priority, status: t.status, due_date: t.dueDate || null,
         canvas_id: t.canvasId, tags: t.tags, created_at: t.createdAt, updated_at: t.updatedAt,
-      }))).then();
+      }))));
     }
     return newTasks.length;
   },

@@ -43,7 +43,21 @@ export default function CourseDetailScreen() {
   const [targetGrade, setTargetGrade] = useState<number | null>(null);
 
   const enrollment = course?.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null) || course?.enrollments?.[0];
-  const score = enrollment?.computed_current_score ?? enrollment?.computed_final_score;
+  const enrollmentScore = enrollment?.computed_current_score ?? enrollment?.computed_final_score;
+
+  const computedScore = useMemo(() => {
+    let earned = 0, possible = 0;
+    for (const a of courseAssignments) {
+      const sub = subMap.get(a.id);
+      if (sub?.workflow_state === 'graded' && sub.score != null && a.points_possible > 0) {
+        earned += sub.score;
+        possible += a.points_possible;
+      }
+    }
+    return possible > 0 ? (earned / possible) * 100 : null;
+  }, [courseAssignments, subMap]);
+
+  const score = (enrollmentScore != null && enrollmentScore > 0) ? enrollmentScore : computedScore;
 
   const targetCalc = useMemo(() => {
     if (targetGrade == null) return null;
@@ -186,7 +200,7 @@ export default function CourseDetailScreen() {
                         key={item.id}
                         onPress={() => {
                           if (item.type === 'Assignment' && item.content_id) {
-                            router.push(`/canvas/assignment/${item.content_id}`);
+                            router.push(`/canvas/assignment/${item.content_id}` as any);
                           } else if (item.html_url && Platform.OS === 'web') {
                             window.open(item.html_url, '_blank');
                           }
@@ -234,7 +248,7 @@ export default function CourseDetailScreen() {
                 return (
                   <TouchableOpacity
                     key={a.id}
-                    onPress={() => router.push(`/canvas/assignment/${a.id}`)}
+                    onPress={() => router.push(`/canvas/assignment/${a.id}` as any)}
                     style={[styles.assignmentRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                   >
                     <View style={{ flex: 1 }}>

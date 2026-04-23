@@ -143,14 +143,14 @@ export default function PrivacyScreen() {
             icon={Lock} iconColor="#8b5cf6"
             label="Change Password"
             subtitle="Opens your account security settings"
-            onPress={() => router.push('/settings/account')}
+            onPress={() => router.push('/settings/account' as any)}
             last={false}
           />
           <Row
             icon={Eye} iconColor="#06b6d4"
             label="Active Sessions"
             subtitle="View and revoke active sessions"
-            onPress={() => router.push('/settings/account')}
+            onPress={() => router.push('/settings/account' as any)}
             last
           />
         </Section>

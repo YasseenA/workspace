@@ -36,7 +36,7 @@ export const canvas = {
 
   getCourses: async (token: string) => {
     const res = await fetch(
-      `${getBase()}/api/v1/courses?enrollment_state=active&per_page=50&include[]=total_scores&include[]=current_grading_period_scores`,
+      `${getBase()}/api/v1/courses?enrollment_state=active&per_page=50&include[]=total_scores&include[]=current_grading_period_scores&include[]=enrollments`,
       { headers: { Authorization: `Bearer ${token}`, ...schoolHeaders() } }
     );
     if (res.status === 401) throw new Error('TOKEN_EXPIRED');

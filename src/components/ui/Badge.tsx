@@ -4,7 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 type Variant = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 interface Props {
-  children: string;
+  children: React.ReactNode;
   variant?: Variant;
   size?:    'sm' | 'md';
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 import { getClasses, getAllAssignments, TeamsClass, TeamsAssignment } from '../lib/teams';
 
 interface TeamsState {
@@ -69,18 +69,18 @@ export const useTeamsStore = create<TeamsState>()((set, get) => ({
       const assignments = await getAllAssignments(token, classes);
       const now         = new Date().toISOString();
       set({ assignments, lastSync: now, isSyncing: false });
-      if (userId) supabase.from('profiles').update({
+      if (userId) bgSync(supabase.from('profiles').update({
         teams_assignments: assignments, teams_last_sync: now,
-      }).eq('user_id', userId).then();
+      }).eq('user_id', userId));
     } catch (e: any) { set({ isSyncing: false, error: e.message }); throw e; }
   },
 
   disconnect: () => {
     const { userId } = get();
     set({ connected: false, token: null, classes: [], assignments: [], lastSync: null });
-    if (userId) supabase.from('profiles').update({
+    if (userId) bgSync(supabase.from('profiles').update({
       teams_token: null, teams_courses: [], teams_assignments: [],
-    }).eq('user_id', userId).then();
+    }).eq('user_id', userId));
   },
 
   clear: () => set({ connected: false, token: null, classes: [], assignments: [], lastSync: null, isSyncing: false, error: null, userId: null }),

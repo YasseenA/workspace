@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 import { initialCardState, reviewCard, isDue, type CardState, type SRSRating } from '../lib/srs';
 
 export interface Flashcard {
@@ -81,13 +81,13 @@ export const useFlashcardsStore = create<FlashcardsState>()((set, get) => ({
   deleteDeck: (deckId) => {
     const { userId } = get();
     set(s => ({ decks: s.decks.filter(d => d.id !== deckId) }));
-    if (userId) supabase.from('flashcard_decks').delete().eq('id', deckId).then();
+    if (userId) bgSync(supabase.from('flashcard_decks').delete().eq('id', deckId));
   },
 
   renameDeck: (deckId, name) => {
     const { userId } = get();
     set(s => ({ decks: s.decks.map(d => d.id === deckId ? { ...d, name } : d) }));
-    if (userId) supabase.from('flashcard_decks').update({ name }).eq('id', deckId).then();
+    if (userId) bgSync(supabase.from('flashcard_decks').update({ name }).eq('id', deckId));
   },
 
   rateCard: (deckId, cardId, rating) => {
@@ -104,7 +104,7 @@ export const useFlashcardsStore = create<FlashcardsState>()((set, get) => ({
     set({ decks });
     const updated = decks.find(d => d.id === deckId);
     if (userId && updated) {
-      supabase.from('flashcard_decks').update({ cards: updated.cards }).eq('id', deckId).then();
+      bgSync(supabase.from('flashcard_decks').update({ cards: updated.cards }).eq('id', deckId));
     }
   },
 

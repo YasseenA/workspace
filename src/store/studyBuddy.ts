@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 
 export type SBMessage = {
   id: string; role: 'user' | 'assistant'; text: string; timestamp: number;
@@ -29,7 +29,7 @@ export const useStudyBuddyStore = create<StudyBuddyState>()((set, get) => ({
     const timestamp = Date.now();
     set(s => ({ messages: [...s.messages, { id, role, text, timestamp }] }));
     const { userId } = get();
-    if (userId) supabase.from('study_buddy_messages').insert({ id, user_id: userId, role, text, timestamp }).then();
+    if (userId) bgSync(supabase.from('study_buddy_messages').insert({ id, user_id: userId, role, text, timestamp }));
     return id;
   },
 
@@ -44,14 +44,14 @@ export const useStudyBuddyStore = create<StudyBuddyState>()((set, get) => ({
     const { messages, userId } = get();
     if (userId && messages.length) {
       const last = messages[messages.length - 1];
-      supabase.from('study_buddy_messages').update({ text: last.text }).eq('id', last.id).then();
+      bgSync(supabase.from('study_buddy_messages').update({ text: last.text }).eq('id', last.id));
     }
   },
 
   clearHistory: () => {
     const { userId } = get();
     set({ messages: [] });
-    if (userId) supabase.from('study_buddy_messages').delete().eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('study_buddy_messages').delete().eq('user_id', userId));
   },
 
   clear: () => set({ messages: [], userId: null }),

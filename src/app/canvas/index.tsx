@@ -307,14 +307,26 @@ export default function CanvasScreen() {
                 const courseAssignments = assignments.filter(a => a.course_id === course.id);
                 const upcoming = courseAssignments.filter(a => !a.due_at || new Date(a.due_at) > now);
                 const enrollment = course.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null) || course.enrollments?.[0];
-                const currentScore = enrollment?.computed_current_score ?? enrollment?.computed_final_score;
+                const enrollScore = enrollment?.computed_current_score ?? enrollment?.computed_final_score;
+                const courseSubs = submissions.filter(s => s.course_id === course.id);
+                const subMap = new Map(courseSubs.map(s => [s.assignment_id, s]));
+                let earned = 0, possible = 0;
+                for (const a of courseAssignments) {
+                  const sub = subMap.get(a.id);
+                  if (sub?.workflow_state === 'graded' && sub.score != null && a.points_possible > 0) {
+                    earned += sub.score;
+                    possible += a.points_possible;
+                  }
+                }
+                const fromSubs = possible > 0 ? (earned / possible) * 100 : null;
+                const currentScore = (enrollScore != null && enrollScore > 0) ? enrollScore : fromSubs;
                 const gradeColor = currentScore == null ? colors.textTertiary
                   : currentScore >= 90 ? colors.success
                   : currentScore >= 80 ? colors.primary
                   : currentScore >= 70 ? colors.warning
                   : colors.error;
                 return (
-                  <TouchableOpacity key={course.id} onPress={() => router.push(`/canvas/course/${course.id}`)} activeOpacity={0.7} style={[styles.courseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <TouchableOpacity key={course.id} onPress={() => router.push(`/canvas/course/${course.id}` as any)} activeOpacity={0.7} style={[styles.courseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: upcoming.length > 0 ? 10 : 0 }}>
                       <View style={[styles.courseIcon, { backgroundColor: colors.primaryLight }]}>
                         <BookOpen size={18} color={colors.primary} />
@@ -324,7 +336,7 @@ export default function CanvasScreen() {
                         <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>{course.course_code}</Text>
                       </View>
                       {currentScore != null ? (
-                        <TouchableOpacity onPress={() => router.push('/settings/grades')} activeOpacity={0.7} style={{ alignItems: 'center', justifyContent: 'center', minWidth: 70 }}>
+                        <TouchableOpacity onPress={() => router.push('/settings/grades' as any)} activeOpacity={0.7} style={{ alignItems: 'center', justifyContent: 'center', minWidth: 70 }}>
                           <Text style={{ fontSize: 18, fontWeight: '800', color: gradeColor }}>{Math.round(currentScore)}%</Text>
                         </TouchableOpacity>
                       ) : (

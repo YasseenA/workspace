@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 import { canvas, CanvasCourse, CanvasAssignment, CanvasSubmission } from '../lib/canvas';
 import { fetchAndParseICal } from '../lib/ical';
 
@@ -100,9 +100,9 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
   disconnect: () => {
     const { userId } = get();
     set({ connected: false, token: null, icalUrl: null, courses: [], assignments: [], submissions: [], lastSync: null });
-    if (userId) supabase.from('profiles').update({
+    if (userId) bgSync(supabase.from('profiles').update({
       canvas_token: null, canvas_courses: [], canvas_assignments: [], canvas_submissions: [],
-    }).eq('user_id', userId).then();
+    }).eq('user_id', userId));
   },
 
   sync: async () => {
@@ -121,13 +121,13 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
       ]);
       const now = new Date().toISOString();
       set({ courses: activeCourses, assignments, submissions, lastSync: now, isSyncing: false });
-      if (userId) supabase.from('profiles').update({
+      if (userId) bgSync(supabase.from('profiles').update({
         canvas_courses: activeCourses, canvas_assignments: assignments, canvas_submissions: submissions, canvas_last_sync: now,
-      }).eq('user_id', userId).then();
+      }).eq('user_id', userId));
     } catch (e: any) {
       if (e.message === 'TOKEN_EXPIRED') {
         set({ isSyncing: false, connected: false, token: null, error: 'Your Canvas token has expired. Please reconnect.' });
-        if (userId) supabase.from('profiles').update({ canvas_token: null }).eq('user_id', userId).then();
+        if (userId) bgSync(supabase.from('profiles').update({ canvas_token: null }).eq('user_id', userId));
       } else {
         set({ isSyncing: false, error: e.message });
       }
@@ -159,7 +159,7 @@ export const useCanvasStore = create<CanvasState>()((set, get) => ({
           : s)
       : [...submissions, { assignment_id: assignmentId, course_id: courseId, workflow_state: 'submitted', submitted_at: now, score: null, grade: null, late: false, missing: false }];
     set({ submissions: newSubs });
-    if (userId) supabase.from('profiles').update({ canvas_submissions: newSubs }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ canvas_submissions: newSubs }).eq('user_id', userId));
   },
 
   clear: () => set({ connected: false, token: null, icalUrl: null, courses: [], assignments: [], submissions: [], lastSync: null, isSyncing: false, error: null, userId: null }),

@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL  = process.env.EXPO_PUBLIC_SUPABASE_URL  || 'https://dcdlmfqayfrfpctuwnja.supabase.co';
-const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZGxtZnFheWZyZnBjdHV3bmphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMzU4NjMsImV4cCI6MjA5MTcxMTg2M30.CY4fUoKpRTAV9oAezcGtEyzpZqQcxNy7NcJByEHpNDc';
+const SUPABASE_URL  = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+if (!SUPABASE_URL || !SUPABASE_ANON) {
+  throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY env vars');
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: false }, // Clerk handles auth, not Supabase
@@ -15,6 +19,10 @@ export async function setSupabaseUserId(userId: string) {
 }
 export function getSupabaseUserId() {
   return _currentUserId;
+}
+
+export function bgSync(query: PromiseLike<{ error: any }>) {
+  query.then(({ error }) => { if (error) console.error('[sync]', error.message); });
 }
 
 // Run this SQL in Supabase → SQL Editor to create all tables:

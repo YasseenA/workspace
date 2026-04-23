@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 
 export interface SessionEntry { date: string; minutes: number; label: string; }
 
@@ -42,13 +42,13 @@ export const useFocusStore = create<FocusState>()((set, get) => ({
   setWorkMinutes: (m) => {
     set({ workMinutes: m });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ work_minutes: m }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ work_minutes: m }).eq('user_id', userId));
   },
 
   setBreakMinutes: (m) => {
     set({ breakMinutes: m });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ break_minutes: m }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ break_minutes: m }).eq('user_id', userId));
   },
 
   recordSession: (minutes, label) => {
@@ -72,13 +72,13 @@ export const useFocusStore = create<FocusState>()((set, get) => ({
       sessionLog: trimmedLog,
     }));
 
-    if (userId) supabase.from('profiles').update({
+    if (userId) bgSync(supabase.from('profiles').update({
       sessions: get().sessions,
       total_focus_minutes: get().totalFocusMinutes,
       streak: newStreak,
       last_session_date: today,
       focus_session_log: trimmedLog,
-    }).eq('user_id', userId).then();
+    }).eq('user_id', userId));
   },
 
   setFocusTask: (id, title) => set({ focusTaskId: id, focusTaskTitle: title }),

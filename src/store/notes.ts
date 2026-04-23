@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 
 export interface Note {
   id: string; title: string; content: string; excerpt: string;
@@ -78,12 +78,12 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
       images: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     set(s => ({ notes: [note, ...s.notes] }));
-    if (userId) supabase.from('notes').insert({
+    if (userId) bgSync(supabase.from('notes').insert({
       id: note.id, user_id: userId, title: note.title, content: note.content,
       excerpt: note.excerpt, notebook_id: note.notebookId || null, tags: note.tags,
       is_pinned: false, is_favorite: false, word_count: note.wordCount,
       images: [], created_at: note.createdAt, updated_at: note.updatedAt,
-    }).then();
+    }));
     return note;
   },
 
@@ -108,14 +108,14 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
       if (data.images !== undefined)    patch.images      = data.images;
       if (data.isPinned !== undefined)  patch.is_pinned   = data.isPinned;
       if (data.isFavorite !== undefined)patch.is_favorite = data.isFavorite;
-      supabase.from('notes').update(patch).eq('id', id).eq('user_id', userId).then();
+      bgSync(supabase.from('notes').update(patch).eq('id', id).eq('user_id', userId));
     }
   },
 
   deleteNote: (id) => {
     const userId = get().userId;
     set(s => ({ notes: s.notes.filter(n => n.id !== id) }));
-    if (userId) supabase.from('notes').delete().eq('id', id).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('notes').delete().eq('id', id).eq('user_id', userId));
   },
 
   togglePin: (id) => {
@@ -132,7 +132,7 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
     const userId = get().userId;
     const nb: Notebook = { id: 'nb' + Date.now(), name, color, icon: '📓', noteCount: 0 };
     set(s => ({ notebooks: [...s.notebooks, nb] }));
-    if (userId) supabase.from('notebooks').insert({ id: nb.id, user_id: userId, name, color, icon: '📓' }).then();
+    if (userId) bgSync(supabase.from('notebooks').insert({ id: nb.id, user_id: userId, name, color, icon: '📓' }));
     return nb;
   },
 

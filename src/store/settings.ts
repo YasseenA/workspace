@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 
 export const ACCENT_COLORS = [
   { name: 'Violet',  value: '#7c3aed' },
@@ -44,25 +44,25 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     const next = !get().darkMode;
     set({ darkMode: next });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ dark_mode: next }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ dark_mode: next }).eq('user_id', userId));
   },
 
   setDarkMode: (v) => {
     set({ darkMode: v });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ dark_mode: v }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ dark_mode: v }).eq('user_id', userId));
   },
 
   setAccentColor: (color) => {
     set({ accentColor: color });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ accent_color: color }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ accent_color: color }).eq('user_id', userId));
   },
 
   setNotificationsEnabled: (v) => {
     set({ notificationsEnabled: v });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ notifications_enabled: v }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ notifications_enabled: v }).eq('user_id', userId));
   },
 
   addNotifiedId: (id) => set(s => ({ notifiedIds: [...s.notifiedIds, id] })),

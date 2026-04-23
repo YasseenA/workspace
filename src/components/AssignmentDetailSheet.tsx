@@ -81,7 +81,7 @@ function CanvasDetail({ data, course, submission, colors, onClose }: {
 
   const goToFullPage = () => {
     onClose();
-    router.push(`/canvas/assignment/${data.id}`);
+    router.push(`/canvas/assignment/${data.id}` as any);
   };
 
   return (
@@ -376,7 +376,7 @@ export default function AssignmentDetailSheet({ item, onClose, onCompleteTask }:
       >
         {/* Handle — tapping it opens the full page for canvas items */}
         <TouchableOpacity
-          onPress={item.kind === 'canvas' ? () => { onClose(); router.push(`/canvas/assignment/${item.data.id}`); } : undefined}
+          onPress={item.kind === 'canvas' ? () => { onClose(); router.push(`/canvas/assignment/${item.data.id}` as any); } : undefined}
           activeOpacity={item.kind === 'canvas' ? 0.5 : 1}
           style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 10, marginHorizontal: -20 }}
         >
@@ -397,7 +397,7 @@ export default function AssignmentDetailSheet({ item, onClose, onCompleteTask }:
 
         {/* Title — tapping it also opens full page for canvas */}
         <TouchableOpacity
-          onPress={item.kind === 'canvas' ? () => { onClose(); router.push(`/canvas/assignment/${item.data.id}`); } : undefined}
+          onPress={item.kind === 'canvas' ? () => { onClose(); router.push(`/canvas/assignment/${item.data.id}` as any); } : undefined}
           activeOpacity={item.kind === 'canvas' ? 0.7 : 1}
         >
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={3}>

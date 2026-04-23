@@ -420,7 +420,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── My Classes ── */}
-        {canvasConnected && courses.filter(c => c.enrollments && c.enrollments.length > 0).length > 0 && (
+        {canvasConnected && courses.length > 0 && (
           <>
             <View style={[styles.sectionHeader, { marginTop: 12 }]}>
               <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>My Classes</Text>
@@ -429,18 +429,27 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ gap: 8, paddingHorizontal: 16 }}>
-              {courses
-                .filter(c => c.enrollments && c.enrollments.length > 0)
-                .map(c => {
+              {courses.map(c => {
                   const enrollment = c.enrollments?.find(e => e.computed_current_score != null || e.computed_final_score != null);
-                  const score = enrollment?.computed_current_score ?? enrollment?.computed_final_score ?? null;
+                  const enrollScore = enrollment?.computed_current_score ?? enrollment?.computed_final_score ?? null;
+                  const courseAssigns = assignments.filter(a => a.course_id === c.id);
+                  let earned = 0, possible = 0;
+                  for (const a of courseAssigns) {
+                    const sub = subMap.get(a.id);
+                    if (sub?.workflow_state === 'graded' && sub.score != null && a.points_possible > 0) {
+                      earned += sub.score;
+                      possible += a.points_possible;
+                    }
+                  }
+                  const fromSubs = possible > 0 ? (earned / possible) * 100 : null;
+                  const score = (enrollScore != null && enrollScore > 0) ? enrollScore : fromSubs;
                   const gc = score != null
                     ? (score >= 90 ? colors.success : score >= 80 ? colors.primary : score >= 70 ? colors.warning : colors.error)
                     : colors.textTertiary;
                   return (
                     <TouchableOpacity
                       key={c.id}
-                      onPress={() => router.push(`/canvas/course/${c.id}`)}
+                      onPress={() => router.push(`/canvas/course/${c.id}` as any)}
                       style={[styles.gradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                     >
                       <View style={{ flex: 1 }}>

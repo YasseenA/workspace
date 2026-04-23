@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 import { setCanvasBase } from '../lib/canvas';
 
 interface AppUserData {
@@ -64,20 +64,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const patch: any = {};
       if (d.school)         patch.school          = d.school;
       if (d.canvasBaseUrl)  patch.canvas_base_url = d.canvasBaseUrl;
-      supabase.from('profiles').update(patch).eq('user_id', userId).then();
+      bgSync(supabase.from('profiles').update(patch).eq('user_id', userId));
     }
   },
 
   completeOnboarding: () => {
     set({ hasOnboarded: true });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ has_onboarded: true }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ has_onboarded: true }).eq('user_id', userId));
   },
 
   setCanvasToken: (t) => {
     set({ canvasToken: t });
     const { userId } = get();
-    if (userId) supabase.from('profiles').update({ canvas_token: t }).eq('user_id', userId).then();
+    if (userId) bgSync(supabase.from('profiles').update({ canvas_token: t }).eq('user_id', userId));
   },
 
   resetAppState: () => set({ appData: defaultAppData, hasOnboarded: false, isLoading: false, canvasToken: null, userId: null }),

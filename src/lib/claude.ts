@@ -139,10 +139,10 @@ async function callWithImage(system: string, userText: string, imageBase64: stri
     { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
   ];
   if (userText.trim()) content.push({ type: 'text', text: userText });
-  const res = await fetch(API, {
+  const res = await fetch(CLAUDE_API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] }),
+    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.error?.message || `Claude error ${res.status}`); }
   const d = await res.json();

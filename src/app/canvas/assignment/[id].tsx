@@ -485,7 +485,6 @@ const styles = StyleSheet.create({
   aiBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, borderRadius: 14, paddingVertical: 15,
-    background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' as any,
     backgroundColor: '#7c3aed',
   },
   submitLabel: { fontSize: 15, fontWeight: '700', color: '#fff' },

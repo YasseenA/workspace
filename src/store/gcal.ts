@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { supabase, bgSync } from '../lib/supabase';
 import { fetchGoogleCalendar, GCalEvent } from '../lib/gcal';
 
 interface GCalState {
@@ -39,9 +39,9 @@ export const useGCalStore = create<GCalState>()((set, get) => ({
     try {
       const events = await fetchGoogleCalendar(feedUrl);
       set({ connected: true, feedUrl, events, isSyncing: false });
-      if (userId) supabase.from('profiles').update({
+      if (userId) bgSync(supabase.from('profiles').update({
         gcal_feed_url: feedUrl, gcal_events: events,
-      }).eq('user_id', userId).then();
+      }).eq('user_id', userId));
     } catch (e: any) {
       set({ isSyncing: false, error: e.message || 'Failed to connect calendar' });
       throw e;
@@ -51,9 +51,9 @@ export const useGCalStore = create<GCalState>()((set, get) => ({
   disconnect: () => {
     const { userId } = get();
     set({ connected: false, feedUrl: null, events: [] });
-    if (userId) supabase.from('profiles').update({
+    if (userId) bgSync(supabase.from('profiles').update({
       gcal_feed_url: null, gcal_events: null,
-    }).eq('user_id', userId).then();
+    }).eq('user_id', userId));
   },
 
   sync: async () => {
@@ -63,9 +63,9 @@ export const useGCalStore = create<GCalState>()((set, get) => ({
     try {
       const events = await fetchGoogleCalendar(feedUrl);
       set({ events, isSyncing: false });
-      if (userId) supabase.from('profiles').update({
+      if (userId) bgSync(supabase.from('profiles').update({
         gcal_events: events,
-      }).eq('user_id', userId).then();
+      }).eq('user_id', userId));
     } catch (e: any) {
       set({ isSyncing: false, error: e.message });
     }
